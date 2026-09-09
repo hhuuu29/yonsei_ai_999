@@ -1,0 +1,8 @@
+.git/
+.worktrees/
+data/
+design/
+docs/
+tests/
+AGENTS.md
+README.md

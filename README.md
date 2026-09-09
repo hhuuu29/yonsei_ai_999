@@ -1,5 +1,7 @@
 # 두투두 (DoToDo)
 
+라이브: [https://dotodo-ten.vercel.app](https://dotodo-ten.vercel.app)
+
 카카오톡 대화보내기 텍스트에서 일정을 추출해 `.ics`로 저장하는 오프라인 웹앱.
 
 ## 사용
