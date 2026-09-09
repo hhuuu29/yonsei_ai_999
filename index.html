@@ -438,7 +438,8 @@
       box-shadow: 0 16px 40px rgba(14, 27, 26, .14);
     }
     .api-panel[hidden] { display: none; }
-    .api-panel label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
+    .api-panel label { display: block; font-size: 12px; color: var(--ink-2); margin: 10px 0 5px; }
+    .api-panel label:first-child { margin-top: 0; }
     .api-panel input {
       width: 100%;
       border: 1px solid var(--hair);
@@ -627,6 +628,13 @@
       color: var(--ink);
       font-size: 13.5px;
     }
+    .msg.bot a.cal-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: inherit;
+      font-weight: 700;
+      text-underline-offset: 2px;
+    }
     .compose {
       display: flex;
       gap: 8px;
@@ -768,6 +776,8 @@
           <input id="rememberApiKey" type="checkbox" checked />
           이 브라우저에 기억
         </label>
+        <label for="googleClientIdInput">Google Client ID</label>
+        <input id="googleClientIdInput" type="text" autocomplete="off" spellcheck="false" placeholder="OAuth 웹 클라이언트 ID" />
       </div>
       <div class="app-status" id="status" role="status" aria-live="polite"></div>
     </header>
@@ -797,7 +807,7 @@
       <div class="bl" id="boardList"></div>
       <div class="ba">
         <button type="button" id="btnExport" disabled>.ics 저장</button>
-        <button type="button" class="go" disabled title="4단계에서 연결">구글 캘린더에 추가</button>
+        <button type="button" class="go" id="btnGoogle" disabled>구글 캘린더에 추가</button>
       </div>
     </aside>
   </div>
@@ -1826,7 +1836,9 @@
 
 })();
   </script>
+  <script src="https://accounts.google.com/gsi/client"></script>
   <script src="chat-assistant.js"></script>
+  <script src="google-calendar.js"></script>
   <script src="ui.js"></script>
 </body>
 </html>

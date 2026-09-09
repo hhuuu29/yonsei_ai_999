@@ -83,7 +83,7 @@
       '- addReminder: {"type":"addReminder","eventId":"...","minutesBefore":30}',
       '- toggleInclude: {"type":"toggleInclude","eventId":"...","included":true}',
       '- applySuggestedDate: {"type":"applySuggestedDate","eventId":"..."}',
-      '- exportAll: {"type":"exportAll"}',
+      '- exportAll: {"type":"exportAll"} 선택된 일정을 Google Calendar에 등록한다. 연결할 수 없으면 .ics로 저장한다.',
       "일정 식별에는 반드시 제공된 eventId를 그대로 사용한다.",
       "답변 다음에 현재 컨텍스트로 이어서 물을 만한 suggestedQuestions를 2~3개 제안한다.",
       "출력 스키마:",

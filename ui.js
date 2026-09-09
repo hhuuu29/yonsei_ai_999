@@ -8,6 +8,7 @@
 
   var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
   var API_KEY_STORAGE = "dotodo.geminiApiKey";
+  var CLIENT_ID_STORAGE = "dotodo.googleClientId";
 
   function confidenceDots(confidence) {
     var value = typeof confidence === "number" && isFinite(confidence) ? confidence : 0.75;
@@ -102,6 +103,13 @@
     return { changedEventIds: Object.keys(changed), exportAll: exportAll };
   }
 
+  function applyCalendarConflicts(events, conflicts) {
+    (events || []).forEach(function (event) {
+      event.conflicts = (conflicts && event.eventId && conflicts[event.eventId]) || [];
+    });
+    return events;
+  }
+
   function parseDocumentMessages(text, fileName, today) {
     var fallback = today instanceof Date ? today : new Date();
     var date = new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
@@ -139,7 +147,8 @@
       confidenceDots: confidenceDots,
       prepareEvents: prepareEvents,
       parseDocumentMessages: parseDocumentMessages,
-      applyAssistantActions: applyAssistantActions
+      applyAssistantActions: applyAssistantActions,
+      applyCalendarConflicts: applyCalendarConflicts
     };
   }
 
@@ -147,6 +156,7 @@
   var core = root.DoToDo;
   var llm = root.DoToDoLLM;
   var assistant = root.DoToDoAssistant;
+  var calendar = root.DoToDoCalendar;
   if (!core) return { confidenceDots: confidenceDots, prepareEvents: prepareEvents };
 
   var chat = document.getElementById("chat");
@@ -157,6 +167,8 @@
   var mobileEventCount = document.getElementById("mobileEventCount");
   var selectedCount = document.getElementById("selectedCount");
   var btnExport = document.getElementById("btnExport");
+  var btnGoogle = document.getElementById("btnGoogle");
+  var googleClientIdInput = document.getElementById("googleClientIdInput");
   var fileInput = document.getElementById("fileInput");
   var composer = document.getElementById("composer");
   var composerInput = document.getElementById("composerInput");
@@ -179,7 +191,8 @@
     conversation: [],
     history: [],
     assistantBusy: false,
-    assistantRequestId: 0
+    assistantRequestId: 0,
+    googleToken: null
   };
 
   function element(tag, className, text) {
@@ -271,6 +284,23 @@
       }
     } catch (error) {
       setStatus("이 브라우저에서는 API 키를 세션에 저장할 수 없어요.", "warn");
+    }
+  }
+
+  function loadStoredClientId() {
+    try {
+      return root.localStorage.getItem(CLIENT_ID_STORAGE) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function storeClientId(value) {
+    try {
+      if (!value) root.localStorage.removeItem(CLIENT_ID_STORAGE);
+      else root.localStorage.setItem(CLIENT_ID_STORAGE, value);
+    } catch (error) {
+      setStatus("이 브라우저에서는 Google Client ID를 저장할 수 없어요.", "warn");
     }
   }
 
@@ -376,6 +406,9 @@
 
     var note = eventNote(event);
     if (note) card.appendChild(element("div", "note", note));
+    (event.conflicts || []).forEach(function (text) {
+      card.appendChild(element("div", "note", text));
+    });
     return card;
   }
 
@@ -479,6 +512,14 @@
       }
       var bubble = element("div", "msg bot");
       bubble.appendChild(document.createTextNode(entry.text));
+      if (entry.calendarUrl) {
+        var link = element("a", "cal-link", "Google Calendar 열기");
+        link.href = entry.calendarUrl;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        bubble.appendChild(document.createElement("br"));
+        bubble.appendChild(link);
+      }
       if (entry.sourceMsgIndexes && entry.sourceMsgIndexes.length) {
         var sources = element("div", "answer-sources");
         entry.sourceMsgIndexes.forEach(function (sourceIndex, evidenceIndex) {
@@ -560,6 +601,7 @@
     selectedCount.textContent = selected + "개 선택";
     mobileEventCount.textContent = state.events.length;
     btnExport.disabled = selected === 0;
+    if (btnGoogle) btnGoogle.disabled = selected === 0;
   }
 
   function renderAll() {
@@ -685,6 +727,81 @@
     setStatus(picked.length + "개 일정을 .ics로 저장했어요.", "ok");
   }
 
+  function selectedEvents() {
+    return state.events.filter(function (event) { return event.selected; });
+  }
+
+  function tokenStillValid() {
+    return !!(
+      state.googleToken &&
+      state.googleToken.accessToken &&
+      state.googleToken.expiresAt &&
+      state.googleToken.expiresAt - 60000 > Date.now()
+    );
+  }
+
+  function addCalendarResult(count, calendarUrl) {
+    state.conversation.push({
+      role: "assistant",
+      text: count + "개 추가했어요",
+      calendarUrl: calendarUrl || "https://calendar.google.com/calendar/r",
+      sourceMsgIndexes: [],
+      suggestedQuestions: []
+    });
+    renderChat();
+  }
+
+  async function addToGoogleCalendar() {
+    var picked = selectedEvents();
+    if (!picked.length) return false;
+    if (!calendar) {
+      downloadIcs();
+      return false;
+    }
+    var clientId = googleClientIdInput && googleClientIdInput.value.trim();
+    if (!clientId) {
+      apiPanel.hidden = false;
+      aiBadge.setAttribute("aria-expanded", "true");
+      if (googleClientIdInput) googleClientIdInput.focus();
+      setStatus("Google Client ID를 입력한 뒤 다시 추가해 주세요. 지금은 .ics로 저장했어요.", "warn");
+      downloadIcs();
+      return false;
+    }
+
+    var token = tokenStillValid() ? state.googleToken : await calendar.requestAccessToken({
+      clientId: clientId,
+      googleIdentity: root.google
+    });
+    if (!token || token.status !== "success" || !token.accessToken) {
+      state.googleToken = null;
+      downloadIcs();
+      setStatus("Google 계정에 연결하지 못해 .ics로 저장했어요.", "warn");
+      return false;
+    }
+    state.googleToken = token;
+
+    try {
+      if (btnGoogle) btnGoogle.disabled = true;
+      var result = await calendar.syncAndInsert({
+        accessToken: token.accessToken,
+        events: picked,
+        messages: state.messages
+      });
+      applyCalendarConflicts(state.events, result.conflicts || {});
+      addCalendarResult(result.inserted.length, result.calendarUrl);
+      renderBoard();
+      setStatus(result.inserted.length + "개를 Google Calendar에 추가했어요.", "ok");
+      return true;
+    } catch (error) {
+      if (error && error.code === "AUTH") state.googleToken = null;
+      downloadIcs();
+      setStatus("Google Calendar 연결이 끊어져 .ics로 저장했어요.", "warn");
+      return false;
+    } finally {
+      updateSelection();
+    }
+  }
+
   async function sendQuestion(value) {
     var question = String(value || "").trim();
     if (!question || state.assistantBusy) return;
@@ -748,7 +865,7 @@
       if (event) event._flash = true;
     });
     renderAll();
-    if (applied.exportAll) downloadIcs();
+    if (applied.exportAll) addToGoogleCalendar();
     if (applied.changedEventIds.length) {
       setTimeout(function () {
         state.events.forEach(function (event) { event._flash = false; });
@@ -856,6 +973,13 @@
     if (state.raw && apiKeyInput.value.trim()) processChat(state.raw, state.fileName);
   });
   btnExport.addEventListener("click", downloadIcs);
+  if (btnGoogle) btnGoogle.addEventListener("click", function () { addToGoogleCalendar(); });
+  if (googleClientIdInput) {
+    googleClientIdInput.value = loadStoredClientId();
+    googleClientIdInput.addEventListener("input", function () {
+      storeClientId(googleClientIdInput.value.trim());
+    });
+  }
 
   apiKeyInput.value = loadStoredApiKey();
   updateAiBadge();
@@ -866,6 +990,7 @@
     prepareEvents: prepareEvents,
     parseDocumentMessages: parseDocumentMessages,
     applyAssistantActions: applyAssistantActions,
+    applyCalendarConflicts: applyCalendarConflicts,
     processChat: processChat
   };
 });

@@ -240,6 +240,24 @@ test("429 응답은 잠시 후 다시 시도 상태와 룰 결과를 반환한�
   assert.strictEqual(result.events, fallback.events);
 });
 
+test("추출 프롬프트는 원문에 없는 숫자·이름·번호를 추정하지 않는다", async () => {
+  const llm = loadExtractor();
+  let prompt = "";
+  await llm.extract({
+    apiKey: "test-key",
+    messages: [],
+    ruleResult: { events: [] },
+    fetchImpl: async (_url, options) => {
+      prompt = JSON.parse(options.body).contents[0].parts[0].text;
+      return { ok: false, status: 500 };
+    }
+  });
+
+  assert.match(prompt, /원문에 없는 숫자·이름·번호를 추정해서 넣지 마/);
+  assert.match(prompt, /"추정", "아마" 같은 표현이 필요하면 그 정보는 빼/);
+  assert.match(prompt, /제목과 checklist는 원문에서 확인 가능한 내용만/);
+});
+
 test("API 키가 없으면 호출 없이 룰 파서 결과로 폴백한다", async () => {
   const DoToDoLLM = loadExtractor();
   const fallback = ruleFallback();

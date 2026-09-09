@@ -85,3 +85,13 @@ test("챗 비서 actions를 일정 상태에 즉시 반영한다", () => {
   assert.equal(result.exportAll, true);
   assert.deepEqual(result.changedEventIds.sort(), ["mentoring", "return"]);
 });
+
+test("캘린더 충돌 문구를 일정 카드 상태에 붙인다", () => {
+  const ui = require("../ui.js");
+  const events = [{ eventId: "event-gather" }, { eventId: "event-return" }];
+  ui.applyCalendarConflicts(events, {
+    "event-gather": ["기존 일정과 겹쳐요: 팀 스탠드업 08:40–09:10"]
+  });
+  assert.deepEqual(events[0].conflicts, ["기존 일정과 겹쳐요: 팀 스탠드업 08:40–09:10"]);
+  assert.deepEqual(events[1].conflicts, []);
+});
