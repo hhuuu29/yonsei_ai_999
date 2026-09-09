@@ -753,6 +753,7 @@
     }
 
     var loc = extractLocation(work);
+    var workBeforeLoc = work;
     if (loc.match) work = work.replace(loc.match, " ");
 
     // Strip leftover time/place connectors (avoid bare "에" — it breaks "에서")
@@ -765,6 +766,9 @@
 
     // Title from first line remainder; full message stays in description
     var title = summarizeTitle(work.split("\n")[0] || work);
+    if (!title || title === "일정") {
+      title = summarizeTitle((workBeforeLoc.split("\n")[0] || workBeforeLoc || loc.location || "일정"));
+    }
     var allDay = !timeRes;
     var start;
     var end;
