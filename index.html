@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="light dark" />
+  <meta name="color-scheme" content="light" />
   <meta name="theme-color" content="#0f1720" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#e8f0f4" media="(prefers-color-scheme: light)" />
   <title>두투두 — 카카오톡 → 일정</title>
@@ -775,23 +775,28 @@
       .board .close { display: none; }
     }
   </style>
+  <link rel="stylesheet" href="app.css" />
 </head>
 <body>
   <div class="shell">
     <header class="top">
-      <div class="wm">두투두<small>단톡방을 캘린더로</small></div>
+      <div class="wm"><span class="brand-symbol" aria-hidden="true">✓</span>두투두<small>나를 위한 일정 비서</small></div>
       <div class="top-actions">
         <button type="button" class="pill" id="identityButton" aria-expanded="false">나: 선택</button>
-        <button type="button" class="ai-badge" id="aiBadge" aria-controls="apiPanel" aria-expanded="false">AI 정제</button>
+        <button type="button" class="ai-badge" id="aiBadge" aria-controls="apiPanel" aria-expanded="false">설정</button>
         <button type="button" class="pill" id="openBoard" aria-controls="board" aria-expanded="false">일정 <b id="mobileEventCount">0</b></button>
       </div>
       <div class="api-panel" id="apiPanel" hidden>
+        <h3>연결 설정</h3>
+        <p>AI 비서는 별도 설정 없이 사용할 수 있어요.</p>
+        <details class="personal-api"><summary>개인 API 키 사용 (선택)</summary>
         <label for="apiKeyInput">Gemini API 키</label>
-        <input id="apiKeyInput" type="password" autocomplete="off" placeholder="API 키 입력" />
+        <input id="apiKeyInput" type="password" autocomplete="off" placeholder="개인 키를 사용할 때만 입력" />
         <label class="remember">
           <input id="rememberApiKey" type="checkbox" checked />
           이 브라우저에 기억
         </label>
+        </details>
         <label for="googleClientIdInput">Google Client ID</label>
         <input id="googleClientIdInput" type="text" autocomplete="off" spellcheck="false" placeholder="OAuth 웹 클라이언트 ID" />
       </div>
@@ -801,8 +806,8 @@
     <main class="chat" id="chat" aria-live="polite"></main>
 
     <form class="compose" id="composer">
-      <label class="att">
-        파일
+      <label class="att" title="대화 파일 첨부">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 12 6.6-6.6a3.4 3.4 0 0 1 4.8 4.8l-9 9a5 5 0 0 1-7.1-7.1l9-9"/><path d="m7 13 7-7a1.7 1.7 0 0 1 2.4 2.4l-7 7a1.7 1.7 0 0 1-2.4-2.4Z"/></svg>
         <input id="fileInput" type="file" accept=".txt,text/plain" aria-label="카카오톡 대화 파일 첨부" />
       </label>
       <textarea
@@ -810,14 +815,14 @@
         id="composerInput"
         rows="1"
         aria-label="두투두에게 메시지 입력"
-        placeholder="대화 export를 붙여넣거나, 두투두에게 묻기"
+        placeholder="대화 붙여넣기 또는 질문하기"
       ></textarea>
-      <button type="submit" class="send" id="sendButton" aria-label="전송" disabled>↑</button>
+      <button type="submit" class="send" id="sendButton" aria-label="전송" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
     </form>
 
     <aside class="board" id="board" role="dialog" aria-modal="false" aria-labelledby="boardTitle">
       <div class="bh">
-        <h2 id="boardTitle">캘린더에 넣을 일정<small id="selectedCount">0개 선택</small></h2>
+        <h2 id="boardTitle">내 일정판<small id="selectedCount">0개 선택</small></h2>
         <button type="button" class="close" id="closeBoard">닫기</button>
       </div>
       <div class="bl" id="boardList"></div>

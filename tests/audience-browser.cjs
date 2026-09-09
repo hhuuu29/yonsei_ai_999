@@ -7,10 +7,10 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const server = http.createServer((req, res) => {
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
-  if (!['index.html', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js', 'data/trainthon-pc.txt'].includes(file)) {
+  if (!['index.html', 'app.css', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js', 'data/trainthon-pc.txt'].includes(file)) {
     res.writeHead(404).end(); return;
   }
-  res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8');
+  res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8');
   res.end(fs.readFileSync(path.join(root, file)));
 });
 
@@ -25,7 +25,8 @@ const server = http.createServer((req, res) => {
     await page.route('https://accounts.google.com/**', route => route.abort());
     let assistantPrompt = '';
     let extractionGate = null;
-    await page.route('https://generativelanguage.googleapis.com/**', async route => {
+    await page.route('**/api/gemini', async route => {
+      assert.equal(route.request().headers()['x-goog-api-key'], undefined);
       const body = route.request().postDataJSON();
       let result;
       if (body.systemInstruction) {
@@ -49,7 +50,7 @@ const server = http.createServer((req, res) => {
     });
     const origin = `http://127.0.0.1:${server.address().port}`;
     await page.goto(origin);
-    await page.evaluate(() => localStorage.setItem('dotodo.geminiApiKey', 'fixture-key'));
+    assert.equal(await page.evaluate(() => localStorage.getItem('dotodo.geminiApiKey')), null);
     await page.reload();
     await page.route('**/data/trainthon-pc.txt', route => route.fulfill({ status: 404, body: '' }));
     await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
@@ -60,6 +61,7 @@ const server = http.createServer((req, res) => {
       await page.setViewportSize({ width, height: 900 });
       const heights = await page.locator('.compose .att, .compose .in, .compose .send').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
       assert.deepEqual(heights, [44, 44, 44]);
+      if (process.env.DOTODO_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.DOTODO_SCREENSHOT_DIR, 'welcome-' + width + '.png') });
     }
     await page.setViewportSize({ width: 1280, height: 900 });
     for (const file of ['trainthon-pc.txt', 'trainthon-mobile.txt']) {
@@ -88,6 +90,7 @@ const server = http.createServer((req, res) => {
       await mine.locator('.board-checklist summary').click();
       assert.ok(await mine.locator('mark.my-name').count() >= 1);
       assert.equal(await page.locator('#identityButton').innerText(), '나: 신현우');
+      if (process.env.DOTODO_SCREENSHOT_DIR) await page.screenshot({ path: path.join(process.env.DOTODO_SCREENSHOT_DIR, 'result-' + file + '.png') });
       assert.equal(await page.evaluate(() => localStorage.getItem('dotodo.userName')), '신현우');
     }
     await page.locator('#composerInput').fill('나는 무엇을 챙겨?');
@@ -106,7 +109,7 @@ const server = http.createServer((req, res) => {
     const selected = await page.locator('#identityButton').innerText();
     await page.reload();
     assert.equal(await page.locator('#identityButton').innerText(), selected);
-    await page.route('https://generativelanguage.googleapis.com/**', route => route.fulfill({ status: 429, body: '{}' }));
+    await page.route('**/api/gemini', route => route.fulfill({ status: 429, body: '{}' }));
     await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
     await page.getByText('잠시 후 다시 시도', { exact: true }).waitFor();
     assert.equal(await page.locator('#extractionLoading').count(), 0);

@@ -3,5 +3,6 @@
   "framework": null,
   "buildCommand": null,
   "outputDirectory": ".",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "functions": { "api/gemini.js": { "maxDuration": 60 } }
 }

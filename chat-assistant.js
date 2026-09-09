@@ -167,7 +167,8 @@
   async function ask(options) {
     options = options || {};
     var apiKey = String(options.apiKey || "").trim();
-    if (!apiKey) {
+    var useProxy = !apiKey && options.useProxy;
+    if (!apiKey && !useProxy) {
       return {
         status: "disabled",
         reply: "AI 정제를 열어 API 키를 먼저 입력해주세요.",
@@ -200,10 +201,10 @@
 
     try {
       var response = await fetchImpl(
-        API_BASE + encodeURIComponent(MODEL) + ":generateContent",
+        useProxy ? "/api/gemini" : API_BASE + encodeURIComponent(MODEL) + ":generateContent",
         {
           method: "POST",
-          headers: {
+          headers: useProxy ? { "Content-Type": "application/json" } : {
             "Content-Type": "application/json",
             "x-goog-api-key": apiKey
           },
@@ -236,6 +237,7 @@
           suggestedQuestions: []
         };
       }
+      if (response.status === 503) return { status: "error", reply: "AI 연결을 준비 중이에요. 잠시 후 다시 질문해 주세요.", sourceMsgIndexes: [], actions: [], suggestedQuestions: [] };
       if (!response.ok) throw new Error("Gemini HTTP " + response.status);
       var parsed = parseResponse(await response.json(), (options.messages || []).length);
       if (parsed.suggestedQuestions.length < 2) {

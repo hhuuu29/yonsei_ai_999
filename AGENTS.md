@@ -12,8 +12,9 @@
 ## Phase 2 원칙
 - 프레임워크 마이그레이션 금지. 순수 JS, 모듈 파일만 추가
 - Phase 1 순수 함수는 오프라인 폴백으로 유지
-- API 키는 UI 입력 → 기본 localStorage, "이 브라우저에 기억"을 끄면 sessionStorage. 코드/레포에 절대 넣지 않음
-- 디자인은 design/mockup.html이 정답. 색·타이포·레이아웃 그대로
+- 기본 Gemini 키는 Vercel Production의 GEMINI_API_KEY에 저장, /api/gemini 서버 함수로 호출. 코드/레포/브라우저 응답에 절대 넣지 않음. .env*는 Git·배포 제외
+- 개인 키 입력은 설정 안의 선택 기능. 기본 localStorage, "이 브라우저에 기억"을 끄면 sessionStorage
+- 사용자 요청으로 디자인 전면 개편 완료: app.css의 흰색·청회색·파란색 UI가 현재 기준. design/mockup.html은 이전 시안
 - 기능 하나 끝날 때마다 main에 직접 커밋. PR 금지
 
 ## 작업 순서 (바꾸지 말 것)
@@ -24,6 +25,7 @@
 5. [완료] Vercel 배포 — GitHub Pages 계획을 대체, 프로젝트 dotodo
 6. [완료] 나 필터 — 이름 선택·저장, 대상별 일정판, 근거 이름 하이라이트
 7. [완료] 데모 준비 — PC 대화 불러오기 버튼, composer 44px, 추출 로딩 말풍선
+8. [완료] 기본 AI 서버 연결·UI 개편 — Vercel 환경변수, 선택형 개인 키, 클립 첨부 아이콘. 가상 일정으로 실제 Gemini 추출·비서 응답 검증
 
 ## 데모 데이터 (data/)
 - trainthon-mobile.txt: 폰 카톡 내보내기 (9/9 08:13 기준)

@@ -247,7 +247,8 @@
     options = options || {};
     var ruleResult = options.ruleResult || {};
     var apiKey = String(options.apiKey || "").trim();
-    if (!apiKey) return fallback(ruleResult, "disabled", "API 키가 없어 LLM이 비활성화되었습니다.");
+    var useProxy = !apiKey && options.useProxy;
+    if (!apiKey && !useProxy) return fallback(ruleResult, "disabled", "API 키가 없어 LLM이 비활성화되었습니다.");
 
     var fetchImpl = options.fetchImpl || root.fetch;
     if (typeof fetchImpl !== "function") {
@@ -256,10 +257,10 @@
 
     try {
       var response = await fetchImpl(
-        API_BASE + encodeURIComponent(MODEL) + ":generateContent",
+        useProxy ? "/api/gemini" : API_BASE + encodeURIComponent(MODEL) + ":generateContent",
         {
           method: "POST",
-          headers: {
+          headers: useProxy ? { "Content-Type": "application/json" } : {
             "Content-Type": "application/json",
             "x-goog-api-key": apiKey
           },
@@ -281,7 +282,7 @@
         return fallback(ruleResult, "rate_limited", "잠시 후 다시 시도");
       }
       if (!response.ok) {
-        return fallback(ruleResult, "error", "AI 정리에 실패해 룰 결과를 유지합니다.");
+        return fallback(ruleResult, "error", response.status === 503 ? "AI 연결을 준비 중이에요. 우선 기본 일정으로 보여드릴게요." : "AI 정리에 실패해 기본 일정으로 보여드려요.");
       }
 
       var normalized = parseResponse(await response.json());

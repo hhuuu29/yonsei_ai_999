@@ -391,19 +391,26 @@
   }
 
   function updateAiBadge() {
-    var active = !!apiKeyInput.value.trim();
-    aiBadge.classList.toggle("on", active);
-    aiBadge.textContent = active ? "AI 정제 켜짐" : "AI 정제";
+    aiBadge.textContent = "설정";
   }
 
   function addGreeting() {
-    chat.appendChild(element(
+    if (!state.fileName) {
+      var welcome = element("section", "welcome");
+      welcome.appendChild(element("div", "welcome-symbol", "✓"));
+      welcome.appendChild(element("h1", "", "대화는 편하게.\n일정은 가볍게."));
+      welcome.appendChild(element("p", "", "단톡방에 묻힌 약속과 준비물,\n두투두가 나에게 필요한 것만 정리해요."));
+      var steps = element("ol", "welcome-steps");
+      ["대화 불러오기", "내 이름 선택", "캘린더에 담기"].forEach(function (text) { steps.appendChild(element("li", "", text)); });
+      welcome.appendChild(steps);
+      chat.appendChild(welcome);
+    } else chat.appendChild(element(
       "div",
       "msg bot",
       "안녕하세요, 두투두예요. 카카오톡 대화 내보내기 파일을 보내주시면 일정과 챙길 것을 정리해드릴게요."
     ));
     if (!state.fileName) {
-      var chips = element("div", "chips");
+      var chips = element("div", "chips demo-launch");
       var demo = element("button", "", "데모: 트레인톤 단톡방 불러오기");
       demo.type = "button";
       demo.disabled = state.demoLoading;
@@ -663,6 +670,7 @@
 
   function renderChat() {
     chat.innerHTML = "";
+    chat.classList.toggle("is-empty", !state.fileName);
     addGreeting();
     if (!state.fileName) {
       renderConversation();
@@ -705,7 +713,11 @@
   function renderBoard() {
     boardList.innerHTML = "";
     if (!state.events.length && !state.todos.length) {
-      boardList.appendChild(element("div", "board-empty", "파일을 보내면 일정이 여기에 정리돼요."));
+      var empty = element("div", "board-empty board-welcome");
+      empty.appendChild(element("div", "empty-calendar", "✓"));
+      empty.appendChild(element("h3", "", "놓치지 않을 하루"));
+      empty.appendChild(element("p", "", "대화를 불러오면 약속과 챙길 것이\n시간 순서대로 여기에 모여요."));
+      boardList.appendChild(empty);
       updateSelection();
       return;
     }
@@ -828,11 +840,11 @@
     state.todos = [];
     state.summary =
       state.messages.length + "개 메시지에서 일정 " + state.events.length +
-      "개를 찾았어요. AI 정제를 켜면 노이즈와 최신 공지를 더 정확히 정리해요.";
+      "개를 찾았어요. 중요한 공지와 최신 변경을 확인하고 있어요.";
     var apiKey = apiKeyInput.value.trim();
-    state.extracting = !!(apiKey && llm);
+    state.extracting = !!llm;
     renderAll();
-    if (!apiKey || !llm) {
+    if (!llm) {
       setStatus("룰 파서 결과를 표시 중이에요.", "");
       return;
     }
@@ -840,6 +852,7 @@
     setStatus("전체 메시지를 AI로 정리하고 있어요…", "");
     var result = await llm.extract({
       apiKey: apiKey,
+      useProxy: true,
       messages: state.messages,
       ruleResult: ruleResult
     });
@@ -1009,9 +1022,10 @@
     var assistantRequestId = ++state.assistantRequestId;
     var sourceRunId = state.runId;
     renderChat();
-    var previousHistory = state.history.slice();
+    var previousHistory = state.history.slice(-40);
     var result = await assistant.ask({
       apiKey: apiKeyInput.value.trim(),
+      useProxy: true,
       userText: question,
       userName: state.userName,
       teams: state.teams,
@@ -1135,7 +1149,7 @@
   aiBadge.addEventListener("click", function () {
     apiPanel.hidden = !apiPanel.hidden;
     aiBadge.setAttribute("aria-expanded", String(!apiPanel.hidden));
-    if (!apiPanel.hidden) apiKeyInput.focus();
+    if (!apiPanel.hidden && googleClientIdInput) googleClientIdInput.focus();
   });
   apiKeyInput.addEventListener("input", function () {
     storeApiKey(apiKeyInput.value.trim());

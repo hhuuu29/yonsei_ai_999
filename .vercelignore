@@ -1,4 +1,5 @@
 .git/
+.env*
 .worktrees/
 data/*
 !data/trainthon-pc.txt
