@@ -2,6 +2,8 @@
 
 라이브: [https://dotodo-ten.vercel.app](https://dotodo-ten.vercel.app)
 
+정적 데모: [GitHub Pages](https://hhuuu29.github.io/yonsei_ai_999/)
+
 카카오톡 단톡방 대화에서 일정과 챙길 것을 추출하고, 내게 해당하는 공지를 확인하며 비서와 대화해 Google Calendar에 등록하는 웹앱.
 
 ## 제출 정보
@@ -61,6 +63,15 @@
 - 라이브 사이트 또는 정적 HTTP 서버에서 실행한다. 데모 버튼은 `data/trainthon-pc.txt`를 fetch하므로 HTTP 환경이 필요하다.
 - 직접 파일 업로드와 카톡 export 붙여넣기도 지원한다.
 - Phase 1의 순수 함수와 룰 파서는 오프라인 폴백으로 유지한다. AI 추출·챗 비서·Google Calendar에는 네트워크 연결이 필요하다.
+
+### GitHub Pages 배포
+
+- 저장소 **Settings → Pages → Build and deployment → Source → GitHub Actions**를 선택한다.
+- `.github/workflows/pages.yml`은 `main` push 또는 수동 실행 시 기존 테스트를 실행하고 Pages에 배포한다. 별도 빌드·프레임워크·패키지 설치는 없다.
+- 배포 파일은 `index.html`, `app.css`, 네 개의 JS 파일, `data/`의 세 데모 파일만 명시적으로 복사한다. 서버 함수·환경변수 파일·저장소 메타데이터는 업로드하지 않는다.
+- CSS·스크립트·데모 fetch 경로는 상대 경로이므로 프로젝트 경로 `/yonsei_ai_999/`에서도 동작한다. 새 정적 파일을 추가하면 workflow의 복사 목록도 갱신한다.
+- **Pages는 정적 데모다.** 파일 업로드·PC 데모·룰 추출·나 필터·수동 ICS 저장을 사용할 수 있다. `/api/gemini`와 `/api/config`를 실행할 서버가 없어 기본 AI 추출·AI 비서·Google Calendar 직접 연결은 제공되지 않는다. 기본 AI 실패 시 기존 룰 파서로 폴백하며, 선택형 개인 Gemini 키를 입력하면 AI 기능을 사용할 수 있다. 기본 AI와 Calendar 서비스 연결에는 위 Vercel 사이트를 사용한다.
+- Vercel 설정과 완성된 기능 코드는 그대로 유지한다. Gemini 키를 Pages 변수나 정적 파일에 넣지 않는다.
 
 ## 순수 함수 (`window.DoToDo`)
 
