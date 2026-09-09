@@ -253,16 +253,18 @@
       color: var(--ink);
       font-weight: 650;
     }
-    .warn-badge {
-      display: inline-block;
-      margin-top: 0.4rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 8px;
+    .warn-banner {
+      display: none;
+      margin: 0 0 0.75rem;
+      padding: 0.7rem 0.85rem;
+      border-radius: 12px;
       background: var(--warn-bg);
       color: var(--warn);
-      font-size: 0.78rem;
+      font-size: 0.9rem;
       font-weight: 600;
+      border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
     }
+    .warn-banner.show { display: block; }
     .empty {
       padding: 1.25rem 1rem;
       border: 1px dashed var(--line);
@@ -335,6 +337,7 @@
       <h2>추출된 일정</h2>
       <span id="countLabel">0개</span>
     </div>
+    <div id="tooManyWarn" class="warn-banner" role="status"></div>
     <div id="cards" class="cards" aria-live="polite">
       <div class="empty">아직 추출된 일정이 없습니다.</div>
     </div>
@@ -450,7 +453,17 @@
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "X-WR-CALNAME:" + escapeIcsText(calendarName),
-      "X-WR-TIMEZONE:Asia/Seoul"
+      "X-WR-TIMEZONE:Asia/Seoul",
+      "BEGIN:VTIMEZONE",
+      "TZID:Asia/Seoul",
+      "X-LIC-LOCATION:Asia/Seoul",
+      "BEGIN:STANDARD",
+      "TZOFFSETFROM:+0900",
+      "TZOFFSETTO:+0900",
+      "TZNAME:KST",
+      "DTSTART:19700101T000000",
+      "END:STANDARD",
+      "END:VTIMEZONE"
     ];
 
     (events || []).forEach(function (ev, i) {
@@ -719,6 +732,34 @@
     return (text.slice(0, index) + " " + text.slice(index + len)).replace(/\s{2,}/g, " ").trim();
   }
 
+  /** Remove matched spans by index only (no global word scrubbing). Pure. */
+  function cutMatchedSpans(text, spans) {
+    var sorted = (spans || [])
+      .filter(function (s) {
+        return s && typeof s.index === "number" && s.length > 0 && s.index >= 0;
+      })
+      .slice()
+      .sort(function (a, b) { return b.index - a.index; });
+    var out = String(text || "");
+    sorted.forEach(function (s) {
+      out = out.slice(0, s.index) + out.slice(s.index + s.length);
+    });
+    return out.replace(/[ \t]{2,}/g, " ").replace(/\s+\n/g, "\n").trim();
+  }
+
+  /**
+   * Clear-time events first (by datetime), then all-day (by date).
+   * "날짜순" within each group + timed events on top.
+   */
+  function sortEventsTimedFirst(events) {
+    return (events || []).slice().sort(function (a, b) {
+      var aTimed = a.allDay ? 1 : 0;
+      var bTimed = b.allDay ? 1 : 0;
+      if (aTimed !== bTimed) return aTimed - bTimed;
+      return a.start.getTime() - b.start.getTime();
+    });
+  }
+
   function extractLocation(text) {
     var m = text.match(/([가-힣A-Za-z0-9]*?(?:역|홀|센터|카페|회의실|강의실|도서관|식당|공원|캠퍼스|빌딩|타워))\s*(\d+\s*층)?/);
     if (m) {
@@ -749,6 +790,7 @@
 
   /**
    * Extract a single event from one schedule line/snippet. Pure.
+   * Title keeps leftover text; only matched date/time(/location) spans are cut by index.
    * @returns {object|null}
    */
   function extractEventFromLine(line, msg) {
@@ -756,51 +798,56 @@
     if (!text || !messageHasScheduleCue(text)) return null;
 
     var dateRes = extractDate(text, msg.date || msg.sentAt || new Date());
-    var timeRes = findTime(dateRes.rest);
-    var work = dateRes.rest;
-    if (timeRes) {
-      work = stripOnce(work, timeRes.index, timeRes.match.length);
+    // Time from the original line so match indices stay aligned with `text`
+    var timeRes = findTime(text);
+    // Prefer time that sits outside the date match when both overlap oddly
+    if (timeRes && dateRes.dateInfo) {
+      var d0 = dateRes.dateInfo.index;
+      var d1 = d0 + dateRes.dateInfo.match.length;
+      if (timeRes.index >= d0 && timeRes.index < d1) {
+        timeRes = findTime(dateRes.rest);
+        if (timeRes) {
+          // remap index from `rest` back to approximate cut on original via search
+          var rel = text.indexOf(timeRes.match);
+          if (rel >= 0) timeRes = { clock: timeRes.clock, match: timeRes.match, index: rel };
+          else timeRes = null;
+        }
+      }
     }
 
-    // Require a date cue, or time-only falling back to message send date
     if (!dateRes.dateInfo && !timeRes) return null;
-
-    // Skip lines that only have a weak cue in prose without date/time pair,
-    // unless time alone on a dated message context
-    if (!dateRes.dateInfo && timeRes) {
-      // time-only OK
-    }
 
     var eventDate = dateRes.dateInfo
       ? dateRes.dateInfo.date
       : startOfDay(msg.date || msg.sentAt || new Date());
 
+    var spans = [];
+    if (dateRes.dateInfo) {
+      spans.push({ index: dateRes.dateInfo.index, length: dateRes.dateInfo.match.length });
+    }
+    if (timeRes) {
+      spans.push({ index: timeRes.index, length: timeRes.match.length });
+    }
+
+    var work = cutMatchedSpans(text, spans);
     var loc = extractLocation(work);
     var workBeforeLoc = work;
-    if (loc.match) work = work.replace(loc.match, " ");
-
-    work = work
-      .replace(/(오전|오후|아침|저녁|밤|에서|으로|까지|부터)/g, " ")
-      .replace(/(^|[\s])(경|로)(?=[\s]|$)/g, " ")
-      .replace(/[~\-–—]/g, " ")
-      .replace(/(^|[\s])[:;]+|[:;]+(?=[\s]|$)/g, " ")
-      .replace(/\s{2,}/g, " ")
-      .trim();
+    if (loc.match) {
+      var locAt = work.indexOf(loc.match);
+      if (locAt >= 0) {
+        work = cutMatchedSpans(work, [{ index: locAt, length: loc.match.length }]);
+      }
+    }
 
     var title = summarizeTitle(work.split("\n")[0] || work);
     if (!title || title === "일정") {
       title = summarizeTitle(workBeforeLoc.split("\n")[0] || workBeforeLoc || loc.location || "일정");
     }
 
-    // Avoid treating intro lines without real schedule as events:
-    // e.g. "트레인톤 일정 공유합니다!" has no date/time
-    if (!dateRes.dateInfo && !timeRes) return null;
-
     var allDay = !timeRes;
     var start;
     var end;
     if (allDay) {
-      // Date-only lines without time → all-day; but intro text with date cue only is rare
       if (!dateRes.dateInfo) return null;
       start = startOfDay(eventDate);
       end = addDays(eventDate, 1);
@@ -822,6 +869,7 @@
       start: start,
       end: end,
       allDay: allDay,
+      hasClearTime: !allDay,
       location: loc.location || "",
       description: (msg.speaker ? msg.speaker + ": " : "") + text,
       sourceText: text,
@@ -887,6 +935,7 @@
         warnings.push("메시지 처리 중 오류: " + (err && err.message ? err.message : String(err)));
       }
     });
+    events = sortEventsTimedFirst(events);
     return { messages: messages, events: events, warnings: warnings };
   }
 
@@ -896,7 +945,9 @@
     parseScheduleFromKakao: parseScheduleFromKakao,
     eventsToIcs: eventsToIcs,
     extractEventFromMessage: extractEventFromMessage,
-    extractEventsFromMessage: extractEventsFromMessage
+    extractEventsFromMessage: extractEventsFromMessage,
+    sortEventsTimedFirst: sortEventsTimedFirst,
+    cutMatchedSpans: cutMatchedSpans
   };
 
   /* ========================================================================
@@ -911,6 +962,7 @@
   var cardsEl = document.getElementById("cards");
   var statusEl = document.getElementById("status");
   var countLabel = document.getElementById("countLabel");
+  var tooManyWarn = document.getElementById("tooManyWarn");
 
   /** @type {Array} */
   var stateEvents = [];
@@ -918,6 +970,17 @@
   function setStatus(msg, kind) {
     statusEl.textContent = msg || "";
     statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function updateTooManyWarning(count) {
+    if (count > 20) {
+      tooManyWarn.textContent =
+        "추출된 일정이 " + count + "개입니다 (20개 초과). 노이즈가 섞였을 수 있으니 필요한 항목만 선택한 뒤 내보내 주세요. 명확한 시간 일정이 위에 정렬되어 있습니다.";
+      tooManyWarn.classList.add("show");
+    } else {
+      tooManyWarn.textContent = "";
+      tooManyWarn.classList.remove("show");
+    }
   }
 
   function selectedEvents() {
@@ -1075,12 +1138,14 @@
       if (!String(raw || "").trim()) {
         stateEvents = [];
         renderCards();
+        updateTooManyWarning(0);
         setStatus("대화 텍스트를 붙여넣거나 .txt를 업로드해 주세요.", "warn");
         return;
       }
       var result = parseScheduleFromKakao(raw);
       stateEvents = result.events;
       renderCards();
+      updateTooManyWarning(stateEvents.length);
       if (!result.events.length) {
         setStatus(
           "메시지를 " + result.messages.length + "개 읽었지만 일정을 찾지 못했습니다.",
@@ -1088,14 +1153,16 @@
         );
       } else {
         var warnExtra = result.warnings.length ? " · 경고 " + result.warnings.length + "건" : "";
+        var many = result.events.length > 20 ? " · 20개 초과" : "";
         setStatus(
-          "메시지 " + result.messages.length + "개 중 일정 " + result.events.length + "개 추출" + warnExtra,
-          result.warnings.length ? "warn" : "ok"
+          "메시지 " + result.messages.length + "개 중 일정 " + result.events.length + "개 추출" + many + warnExtra,
+          (result.warnings.length || result.events.length > 20) ? "warn" : "ok"
         );
       }
     } catch (err) {
       stateEvents = [];
       renderCards();
+      updateTooManyWarning(0);
       setStatus("파싱 중 오류가 발생했습니다: " + (err && err.message ? err.message : err), "err");
     }
   }
@@ -1146,6 +1213,7 @@
     chatInput.value = "";
     stateEvents = [];
     renderCards();
+    updateTooManyWarning(0);
     setStatus("");
     chatInput.focus();
   });
