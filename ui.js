@@ -8,7 +8,6 @@
 
   var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
   var API_KEY_STORAGE = "dotodo.geminiApiKey";
-  var CLIENT_ID_STORAGE = "dotodo.googleClientId";
   var NAME_STORAGE = "dotodo.userName";
   var audienceApi = root.DoToDoLLM || (typeof require === "function" ? require("./llm-extractor.js") : null);
 
@@ -184,7 +183,6 @@
   var selectedCount = document.getElementById("selectedCount");
   var btnExport = document.getElementById("btnExport");
   var btnGoogle = document.getElementById("btnGoogle");
-  var googleClientIdInput = document.getElementById("googleClientIdInput");
   var fileInput = document.getElementById("fileInput");
   var composer = document.getElementById("composer");
   var composerInput = document.getElementById("composerInput");
@@ -197,6 +195,9 @@
   var identityButton = document.getElementById("identityButton");
 
   var state = {
+    googleClientId: "",
+    calendarConfigReady: false,
+    calendarBusy: false,
     extracting: false,
     demoLoading: false,
     userName: "",
@@ -368,20 +369,17 @@
     }
   }
 
-  function loadStoredClientId() {
+  async function loadCalendarConfig() {
+    state.calendarConfigReady = false;
     try {
-      return root.localStorage.getItem(CLIENT_ID_STORAGE) || "";
-    } catch (error) {
-      return "";
-    }
-  }
-
-  function storeClientId(value) {
-    try {
-      if (!value) root.localStorage.removeItem(CLIENT_ID_STORAGE);
-      else root.localStorage.setItem(CLIENT_ID_STORAGE, value);
-    } catch (error) {
-      setStatus("이 브라우저에서는 Google Client ID를 저장할 수 없어요.", "warn");
+      var response = await root.fetch("/api/config", { cache: "no-store" });
+      if (!response.ok) throw new Error("Config unavailable");
+      var config = await response.json();
+      state.googleClientId = typeof config.googleClientId === "string" && /^[a-zA-Z0-9_-]+\.apps\.googleusercontent\.com$/.test(config.googleClientId) ? config.googleClientId : "";
+    } catch (_) {
+      state.googleClientId = "";
+    } finally {
+      state.calendarConfigReady = true;
     }
   }
 
@@ -780,7 +778,10 @@
     selectedCount.textContent = selected + "개 선택";
     mobileEventCount.textContent = state.events.length;
     btnExport.disabled = selected === 0;
-    if (btnGoogle) btnGoogle.disabled = selected === 0;
+    if (btnGoogle) {
+      btnGoogle.disabled = selected === 0 || state.calendarBusy;
+      btnGoogle.textContent = state.calendarBusy ? "Google 연결·등록 중…" : "구글 캘린더에 추가";
+    }
   }
 
   function renderAll() {
@@ -939,39 +940,40 @@
 
   async function addToGoogleCalendar() {
     var picked = selectedEvents();
-    if (!picked.length) return false;
+    if (!picked.length || state.calendarBusy) return false;
     if (!calendar) {
-      downloadIcs();
+      setStatus("캘린더 연결을 불러오지 못했어요. 새로고침 후 다시 시도해 주세요.", "warn");
       return false;
     }
-    var clientId = googleClientIdInput && googleClientIdInput.value.trim();
-    if (!clientId) {
-      apiPanel.hidden = false;
-      aiBadge.setAttribute("aria-expanded", "true");
-      if (googleClientIdInput) googleClientIdInput.focus();
-      setStatus("Google Client ID를 입력한 뒤 다시 추가해 주세요. 지금은 .ics로 저장했어요.", "warn");
-      downloadIcs();
+    if (!state.calendarConfigReady || !state.googleClientId) {
+      setStatus("캘린더 연결을 준비 중이에요. 잠시 후 다시 눌러주세요.", "warn");
+      if (state.calendarConfigReady) loadCalendarConfig();
       return false;
     }
-
-    var token = tokenStillValid() ? state.googleToken : await calendar.requestAccessToken({
-      clientId: clientId,
-      googleIdentity: root.google
-    });
-    if (!token || token.status !== "success" || !token.accessToken) {
-      state.googleToken = null;
-      downloadIcs();
-      setStatus("Google 계정에 연결하지 못해 .ics로 저장했어요.", "warn");
-      return false;
-    }
-    state.googleToken = token;
-
+    var sourceRunId = state.runId;
+    var sourceMessages = state.messages;
+    state.calendarBusy = true;
+    updateSelection();
     try {
-      if (btnGoogle) btnGoogle.disabled = true;
+      // Config is prefetched so the popup opens directly from the user's click.
+      var token = tokenStillValid() ? state.googleToken : await calendar.requestAccessToken({
+        clientId: state.googleClientId,
+        googleIdentity: root.google
+      });
+      if (!token || token.status !== "success" || !token.accessToken) {
+        state.googleToken = null;
+        setStatus(token && token.status === "denied" ? "Google 연결이 취소됐어요. 다시 누르면 계정을 연결할 수 있어요." : "Google 연결 창을 열지 못했어요. 팝업을 허용하고 다시 눌러주세요.", "warn");
+        return false;
+      }
+      state.googleToken = token;
+      if (sourceRunId !== state.runId) {
+        setStatus("대화가 바뀌었어요. 등록할 일정을 다시 선택해 주세요.", "warn");
+        return false;
+      }
       var result = await calendar.syncAndInsert({
         accessToken: token.accessToken,
         events: picked,
-        messages: state.messages
+        messages: sourceMessages
       });
       applyCalendarConflicts(state.events, result.conflicts || {});
       addCalendarResult(result.inserted.length, result.calendarUrl);
@@ -980,10 +982,10 @@
       return true;
     } catch (error) {
       if (error && error.code === "AUTH") state.googleToken = null;
-      downloadIcs();
-      setStatus("Google Calendar 연결이 끊어져 .ics로 저장했어요.", "warn");
+      setStatus(error && error.code === "AUTH" ? "Google 연결이 만료됐어요. 다시 누르면 계정을 연결할 수 있어요." : "캘린더 등록을 완료하지 못했어요. Google Calendar를 확인한 뒤 다시 시도해 주세요.", "warn");
       return false;
     } finally {
+      state.calendarBusy = false;
       updateSelection();
     }
   }
@@ -1054,7 +1056,10 @@
       if (event) event._flash = true;
     });
     renderAll();
-    if (applied.exportAll) addToGoogleCalendar();
+    if (applied.exportAll) {
+      if (tokenStillValid()) addToGoogleCalendar();
+      else setStatus("일정판의 구글 캘린더에 추가를 누르면 계정 연결 후 바로 등록돼요.", "");
+    }
     if (applied.changedEventIds.length) {
       setTimeout(function () {
         state.events.forEach(function (event) { event._flash = false; });
@@ -1149,7 +1154,6 @@
   aiBadge.addEventListener("click", function () {
     apiPanel.hidden = !apiPanel.hidden;
     aiBadge.setAttribute("aria-expanded", String(!apiPanel.hidden));
-    if (!apiPanel.hidden && googleClientIdInput) googleClientIdInput.focus();
   });
   apiKeyInput.addEventListener("input", function () {
     storeApiKey(apiKeyInput.value.trim());
@@ -1163,12 +1167,7 @@
   });
   btnExport.addEventListener("click", downloadIcs);
   if (btnGoogle) btnGoogle.addEventListener("click", function () { addToGoogleCalendar(); });
-  if (googleClientIdInput) {
-    googleClientIdInput.value = loadStoredClientId();
-    googleClientIdInput.addEventListener("input", function () {
-      storeClientId(googleClientIdInput.value.trim());
-    });
-  }
+  loadCalendarConfig();
 
   apiKeyInput.value = loadStoredApiKey();
   try { state.userName = audienceApi.normalizeName(root.localStorage.getItem(NAME_STORAGE)); } catch (error) { /* storage is optional */ }

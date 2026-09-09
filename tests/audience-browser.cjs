@@ -21,6 +21,20 @@ const server = http.createServer((req, res) => {
     browser = await chromium.launch({ channel: 'msedge', headless: true });
     const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const errors = [];
+    const downloads = [];
+    page.on('download', download => downloads.push(download));
+    await page.route('**/api/config', route => route.fulfill({ json: { googleClientId: 'service-client.apps.googleusercontent.com' } }));
+    await page.addInitScript(() => {
+      window.google = { accounts: { oauth2: { initTokenClient(options) {
+        window.calendarOAuthOptions = options;
+        return { requestAccessToken() { window.calendarOAuthRequested = true; } };
+      } } } };
+    });
+    let calendarPosts = 0;
+    await page.route('https://www.googleapis.com/calendar/v3/**', route => {
+      if (route.request().method() === 'POST') calendarPosts++;
+      return route.fulfill({ json: route.request().method() === 'POST' ? { id: 'created', htmlLink: 'https://calendar.google.com/calendar/r' } : { items: [] } });
+    });
     page.on('pageerror', error => errors.push(error.message));
     await page.route('https://accounts.google.com/**', route => route.abort());
     let assistantPrompt = '';
@@ -50,6 +64,7 @@ const server = http.createServer((req, res) => {
     });
     const origin = `http://127.0.0.1:${server.address().port}`;
     await page.goto(origin);
+    assert.equal(await page.locator('#googleClientIdInput').count(), 0);
     assert.equal(await page.evaluate(() => localStorage.getItem('dotodo.geminiApiKey')), null);
     await page.reload();
     await page.route('**/data/trainthon-pc.txt', route => route.fulfill({ status: 404, body: '' }));
@@ -109,6 +124,28 @@ const server = http.createServer((req, res) => {
     const selected = await page.locator('#identityButton').innerText();
     await page.reload();
     assert.equal(await page.locator('#identityButton').innerText(), selected);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
+    await page.getByText('AI 정제가 끝났어요.', { exact: true }).waitFor();
+    await page.locator('#board input[type=checkbox]').first().check();
+    await page.locator('#btnGoogle').click();
+    assert.equal(await page.evaluate(() => window.calendarOAuthOptions.client_id), 'service-client.apps.googleusercontent.com');
+    assert.equal(calendarPosts, 0);
+    assert.equal(await page.locator('#btnGoogle').isDisabled(), true);
+    await page.evaluate(() => window.calendarOAuthOptions.callback({ access_token: 'fixture-token', expires_in: 3600 }));
+    await page.getByText('1개를 Google Calendar에 추가했어요.', { exact: true }).waitFor();
+    assert.equal(calendarPosts, 1);
+    assert.equal(downloads.length, 0);
+    await page.reload();
+    await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
+    await page.getByText('AI 정제가 끝났어요.', { exact: true }).waitFor();
+    await page.locator('#board input[type=checkbox]').first().check();
+    await page.locator('#btnGoogle').click();
+    await page.evaluate(() => window.calendarOAuthOptions.error_callback({ type: 'popup_closed' }));
+    await page.getByText('Google 연결이 취소됐어요. 다시 누르면 계정을 연결할 수 있어요.', { exact: true }).waitFor();
+    assert.equal(calendarPosts, 1);
+    assert.equal(downloads.length, 0);
+    await page.reload();
     await page.route('**/api/gemini', route => route.fulfill({ status: 429, body: '{}' }));
     await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
     await page.getByText('잠시 후 다시 시도', { exact: true }).waitFor();
