@@ -3,6 +3,24 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
+test("일정과 체크리스트를 각각 나/전체 층으로 나누되 원본 선택 상태는 보존한다", () => {
+  const ui = require("../ui.js");
+  const event = { title: "집합", audience: "all", selected: false, checklist: [
+    { text: "명찰", audience: ["신현우"] },
+    { text: "후드 수령", audience: ["이지연"] }
+  ] };
+  const layers = ui.partitionBoard([event], [{ text: "멘토링", audience: "team:22" }], "신현우", [{ team: 22, names: ["신현우"] }]);
+  assert.equal(layers[0].title, "나에게 해당");
+  assert.equal(layers[0].events[0].event, event);
+  assert.deepEqual(layers[0].events[0].checklist.map(i => i.text), ["명찰"]);
+  assert.deepEqual(layers[0].todos.map(i => i.text), ["멘토링"]);
+  assert.equal(layers[1].title, "전체 공지");
+  assert.deepEqual(layers[1].events[0].checklist.map(i => i.text), ["후드 수령"]);
+  assert.equal(event.selected, false);
+  assert.equal(ui.partitionBoard([event], [], "", []).length, 1);
+  assert.equal(ui.partitionBoard([event], [], "", [])[0].events[0].checklist.length, 2);
+});
+
 test("낮은 확신 일정은 기본 제외하고 확신도는 점 네 개로 표현한다", () => {
   const ui = require("../ui.js");
   const events = ui.prepareEvents([

@@ -9,6 +9,21 @@
   var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
   var API_KEY_STORAGE = "dotodo.geminiApiKey";
   var CLIENT_ID_STORAGE = "dotodo.googleClientId";
+  var NAME_STORAGE = "dotodo.userName";
+  var audienceApi = root.DoToDoLLM || (typeof require === "function" ? require("./llm-extractor.js") : null);
+
+  function partitionBoard(events, todos, name, teams) {
+    var layers = name ? [{ title: "나에게 해당", mine: true }, { title: "전체 공지", mine: false }] : [{ title: "", mine: true }];
+    return layers.map(function (layer) {
+      function matches(item) { return !name || audienceApi.isRelevant(item, name, teams) === layer.mine; }
+      layer.events = (events || []).map(function (event, index) {
+        var checklist = (event.checklist || []).filter(matches);
+        return matches(event) || checklist.length ? { event: event, index: index, checklist: checklist } : null;
+      }).filter(Boolean);
+      layer.todos = (todos || []).filter(matches);
+      return layer;
+    });
+  }
 
   function confidenceDots(confidence) {
     var value = typeof confidence === "number" && isFinite(confidence) ? confidence : 0.75;
@@ -144,6 +159,7 @@
 
   if (!root.document) {
     return {
+      partitionBoard: partitionBoard,
       confidenceDots: confidenceDots,
       prepareEvents: prepareEvents,
       parseDocumentMessages: parseDocumentMessages,
@@ -178,8 +194,13 @@
   var apiKeyInput = document.getElementById("apiKeyInput");
   var rememberApiKey = document.getElementById("rememberApiKey");
   var status = document.getElementById("status");
+  var identityButton = document.getElementById("identityButton");
 
   var state = {
+    userName: "",
+    nameDraft: null,
+    choosingName: false,
+    teams: [],
     events: [],
     todos: [],
     messages: [],
@@ -200,6 +221,64 @@
     if (className) node.className = className;
     if (text != null) node.textContent = text;
     return node;
+  }
+
+  function chooseName(name) {
+    state.userName = audienceApi.normalizeName(name);
+    state.nameDraft = null;
+    state.choosingName = false;
+    // Discard a response requested for the previous identity.
+    state.assistantRequestId += 1;
+    state.assistantBusy = false;
+    state.conversation = state.conversation.filter(function (entry) { return entry.role !== "loading"; });
+    state.history = [];
+    try {
+      if (state.userName) root.localStorage.setItem(NAME_STORAGE, state.userName);
+      else root.localStorage.removeItem(NAME_STORAGE);
+    } catch (error) { setStatus("이름을 저장하지 못했어요. 현재 화면에는 적용했어요.", "warn"); }
+    renderAll();
+    identityButton.focus();
+  }
+
+  function addIdentityPicker() {
+    if (!state.choosingName) return;
+    var bubble = element("div", "msg bot identity-picker");
+    bubble.appendChild(element("p", "", "이 방에서 당신은 누구예요?"));
+    var chips = element("div", "chips identity-chips");
+    var names = Array.from(new Set(state.messages.map(function (message) {
+      return audienceApi.normalizeName(message.speaker || message.sender);
+    }).filter(function (name) { return name && name !== "문서"; })));
+    names.forEach(function (name) {
+      var chip = element("button", "", name);
+      chip.type = "button";
+      chip.setAttribute("aria-pressed", String(name === state.userName));
+      chip.addEventListener("click", function () { chooseName(name); });
+      chips.appendChild(chip);
+    });
+    bubble.appendChild(chips);
+    var form = element("form", "identity-form");
+    var input = element("input");
+    input.id = "identityName";
+    input.type = "text";
+    input.maxLength = 80;
+    input.placeholder = "이름 직접 입력";
+    input.setAttribute("aria-label", "이름 직접 입력");
+    input.value = state.nameDraft === null ? state.userName : state.nameDraft;
+    input.addEventListener("input", function () { state.nameDraft = input.value; });
+    var save = element("button", "pill", "선택");
+    save.type = "submit";
+    form.appendChild(input);
+    form.appendChild(save);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (input.value.trim()) chooseName(input.value);
+    });
+    var skip = element("button", "src", "이름 없이 전체 보기");
+    skip.type = "button";
+    skip.addEventListener("click", function () { chooseName(""); });
+    form.appendChild(skip);
+    bubble.appendChild(form);
+    chat.appendChild(bubble);
   }
 
   function pad2(value) {
@@ -374,7 +453,7 @@
       checkbox.setAttribute("aria-label", event.title + " 선택");
       checkbox.addEventListener("change", function () {
         event.selected = checkbox.checked;
-        updateSelection();
+        renderBoard();
       });
       card.appendChild(checkbox);
     }
@@ -416,6 +495,14 @@
     var text = String(sourceText || "");
     if (!text) {
       container.textContent = "원문 메시지를 찾지 못했습니다.";
+      return;
+    }
+    if (state.userName && text.includes(state.userName)) {
+      var pieces = text.split(state.userName);
+      pieces.forEach(function (piece, index) {
+        if (index) container.appendChild(element("mark", "my-name", state.userName));
+        container.appendChild(document.createTextNode(piece));
+      });
       return;
     }
     var tokens = String(checklistText || "")
@@ -460,6 +547,12 @@
       who.appendChild(document.createTextNode(" " + formatMessageTime(source && source.sentAt)));
       quote.appendChild(who);
       highlightSource(quote, source && source.text, item.text);
+      (item.audienceSourceMsgIndexes || []).forEach(function (sourceIndex) {
+        if (sourceIndex === item.sourceMsgIndex || !state.messages[sourceIndex]) return;
+        var evidence = element("div", "audience-evidence");
+        highlightSource(evidence, state.messages[sourceIndex].text, item.text);
+        quote.appendChild(evidence);
+      });
       row.appendChild(quote);
       sourceButton.addEventListener("click", function () {
         var open = quote.classList.toggle("on");
@@ -546,6 +639,7 @@
     addGreeting();
     if (!state.fileName) {
       renderConversation();
+      addIdentityPicker();
       chat.scrollTop = chat.scrollHeight;
       return;
     }
@@ -563,37 +657,69 @@
       if (event.checklist && event.checklist.length) addChecklistBubble(event, index);
     });
     renderConversation();
+    addIdentityPicker();
     chat.scrollTop = chat.scrollHeight;
   }
 
   function renderBoard() {
     boardList.innerHTML = "";
-    if (state.todos.length) {
-      boardList.appendChild(element("div", "sec", "시간 없는 할 일"));
-      state.todos.forEach(function (todo) {
-        boardList.appendChild(element("div", "todo", todo.text));
-      });
-    }
     if (!state.events.length && !state.todos.length) {
       boardList.appendChild(element("div", "board-empty", "파일을 보내면 일정이 여기에 정리돼요."));
       updateSelection();
       return;
     }
 
-    var sorted = state.events
-      .map(function (event, index) { return { event: event, index: index }; })
-      .sort(function (a, b) { return effectiveDate(a.event) - effectiveDate(b.event); });
-    var lastKey = "";
-    sorted.forEach(function (entry) {
-      var displayDate = effectiveDate(entry.event);
-      var key = dateKey(displayDate);
-      if (key !== lastKey) {
-        boardList.appendChild(element("div", "sec", formatDateSection(displayDate)));
-        lastKey = key;
-      }
-      boardList.appendChild(buildEventCard(entry.event, entry.index, true));
+    partitionBoard(state.events, state.todos, state.userName, state.teams).forEach(function (layer) {
+      var section = element("section", "audience-layer");
+      section.dataset.audienceLayer = layer.title || "all";
+      if (layer.title) section.appendChild(element("h3", "layer-title", layer.title));
+      if (!layer.events.length && !layer.todos.length) section.appendChild(element("div", "board-empty", "해당하는 항목이 없어요."));
+      layer.todos.forEach(function (todo) {
+        var row = element("div", "todo", todo.text);
+        appendItemEvidence(row, todo);
+        section.appendChild(row);
+      });
+      var lastKey = "";
+      layer.events.sort(function (a, b) { return effectiveDate(a.event) - effectiveDate(b.event); }).forEach(function (entry) {
+        var key = dateKey(effectiveDate(entry.event));
+        if (key !== lastKey) {
+          section.appendChild(element("div", "sec", formatDateSection(effectiveDate(entry.event))));
+          lastKey = key;
+        }
+        var card = buildEventCard(entry.event, entry.index, true);
+        var evidence = element("div", "board-evidence");
+        appendItemEvidence(evidence, entry.event);
+        entry.checklist.forEach(function (item) {
+          var row = element("div", "board-checklist", item.text);
+          appendItemEvidence(row, item);
+          evidence.appendChild(row);
+        });
+        card.appendChild(evidence);
+        section.appendChild(card);
+      });
+      boardList.appendChild(section);
     });
     updateSelection();
+  }
+
+  function appendItemEvidence(parent, item) {
+    var details = element("details", "item-evidence");
+    details.appendChild(element("summary", "src", "근거"));
+    var indexes = [item.sourceMsgIndex].concat(item.audienceSourceMsgIndexes || []);
+    if (state.userName && typeof item.audience === "string" && item.audience.startsWith("team:")) {
+      state.teams.forEach(function (team) {
+        if (item.audience === "team:" + team.team) indexes.push(team.sourceMsgIndex);
+      });
+    }
+    var sources = Array.from(new Set(indexes)).map(function (index) { return state.messages[index]; }).filter(Boolean);
+    if (!sources.length) sources = [{ text: item.sourceText || "" }];
+    sources.forEach(function (source) {
+      var quote = element("div", "q on");
+      quote.appendChild(element("div", "who", (source.speaker || "원문") + " " + formatMessageTime(source.sentAt)));
+      highlightSource(quote, source.text, item.text || item.title);
+      details.appendChild(quote);
+    });
+    parent.appendChild(details);
   }
 
   function updateSelection() {
@@ -605,6 +731,8 @@
   }
 
   function renderAll() {
+    identityButton.textContent = "나: " + (state.userName || "선택");
+    identityButton.setAttribute("aria-expanded", String(state.choosingName));
     renderChat();
     renderBoard();
   }
@@ -626,6 +754,7 @@
     var runId = ++state.runId;
     var isNewSource = raw !== state.raw || fileName !== state.fileName;
     if (isNewSource) {
+      state.choosingName = true;
       state.conversation = [];
       state.history = [];
       state.assistantBusy = false;
@@ -653,6 +782,7 @@
     state.raw = raw;
     state.fileName = fileName || "붙여넣은 카카오톡 대화.txt";
     state.messages = ruleResult.messages;
+    state.teams = [];
     state.events = prepareEvents(ruleResult.events);
     state.todos = [];
     state.summary =
@@ -676,6 +806,7 @@
     if (result.status === "success") {
       state.events = enrichLlmEvents(result.events);
       state.todos = result.todos;
+      state.teams = result.teams || [];
       state.summary = result.summary ||
         (state.messages.length + "개 메시지에서 일정 " + state.events.length +
         "개, 할 일 " + state.todos.length + "개를 찾았어요.");
@@ -840,6 +971,8 @@
     var result = await assistant.ask({
       apiKey: apiKeyInput.value.trim(),
       userText: question,
+      userName: state.userName,
+      teams: state.teams,
       messages: state.messages,
       events: state.events,
       todos: state.todos,
@@ -982,10 +1115,20 @@
   }
 
   apiKeyInput.value = loadStoredApiKey();
+  try { state.userName = audienceApi.normalizeName(root.localStorage.getItem(NAME_STORAGE)); } catch (error) { /* storage is optional */ }
+  identityButton.addEventListener("click", function () {
+    state.choosingName = !state.choosingName;
+    renderAll();
+    if (state.choosingName) {
+      var input = document.getElementById("identityName");
+      if (input) input.focus();
+    }
+  });
   updateAiBadge();
   renderAll();
 
   return {
+    partitionBoard: partitionBoard,
     confidenceDots: confidenceDots,
     prepareEvents: prepareEvents,
     parseDocumentMessages: parseDocumentMessages,

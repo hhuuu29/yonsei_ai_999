@@ -9,6 +9,36 @@
   var MODEL = "gemini-3-flash-preview";
   var API_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
 
+  function normalizeName(value) {
+    return String(value || "").trim().replace(/^@/, "").split(/[_/]/)[0].trim().replace(/\s+/g, " ");
+  }
+
+  function normalizeAudience(value) {
+    if (Array.isArray(value)) {
+      return Array.from(new Set(value.filter(function (name) { return typeof name === "string"; })
+        .map(normalizeName).filter(Boolean)));
+    }
+    var team = typeof value === "string" && value.match(/^team:([1-9]\d*)$/);
+    return team ? "team:" + Number(team[1]) : "all";
+  }
+
+  function isRelevant(item, name, teams) {
+    name = normalizeName(name);
+    if (!name) return true;
+    var audience = normalizeAudience(item && item.audience);
+    if (audience === "all") return true;
+    if (Array.isArray(audience)) return audience.indexOf(name) >= 0;
+    return (teams || []).some(function (team) {
+      return audience === "team:" + team.team &&
+        (team.names || []).map(normalizeName).indexOf(name) >= 0;
+    });
+  }
+
+  function audienceSources(item) {
+    return (Array.isArray(item.audienceSourceMsgIndexes) ? item.audienceSourceMsgIndexes : [])
+      .filter(function (index) { return Number.isInteger(index) && index >= 0; });
+  }
+
   function pad2(value) {
     return String(value).padStart(2, "0");
   }
@@ -54,6 +84,11 @@
       "기준 시간대는 Asia/Seoul이다. 아래 모든 메시지와 룰 파서 후보를 함께 검토하라.",
       "",
       "추출 규칙:",
+      "- 누구에게 해당하는 공지인지 판단하라. events, 각 checklist 항목, todos 모두 audience를 반드시 넣는다. 전원은 \"all\", 명단으로 지목된 대상은 [\"이름1\",\"이름2\"], 팀 번호로 지목된 대상은 \"team:N\"이다.",
+      "- 한 메시지에 여러 공지가 있어도 공지별 명단을 따로 연결한다. 부모 일정이 all이어도 명찰 지참 대상·후드집업 수령 대상 checklist에는 각각의 명단을 넣는다. 후드집업 지참(전원)과 수령(명단)은 다른 지시다.",
+      "- 명단·표·팀 배정에 나온 이름을 추출해 매핑한다. 이름_소속은 이름으로 정규화한다. 팀 배정은 teams:[{team:숫자,names:[이름],sourceMsgIndex:배정원문인덱스}]로 반환한다. 메시지에 없는 팀 번호나 링크 안의 내용을 추정하지 않는다.",
+      "- 멘토링 시트에 특정 팀 배정이 원문으로 주어졌다면 해당 항목은 team:N으로 표시한다. 시트 링크만 있으면 특정 팀에 배정하지 않는다.",
+      "- audienceSourceMsgIndexes에는 대상 명단이나 팀 배정의 원문 인덱스를 넣는다. 최신 변경 공지는 sourceMsgIndex에, 이전 대상 명단은 audienceSourceMsgIndexes에 보존한다. 명찰 지참 대상 명단을 잃지 않되 지참 지시는 최신 배부 공지에 맞춰 갱신한다.",
       "- 날짜 해석 기준일은 반드시 각 메시지의 sentAt이다. 담주/다음주/이번주/내일/모레/그때 같은 문맥을 연결한다.",
       "- 날짜와 요일이 불일치하면 숫자 날짜를 우선하고 warnings에 경고한다.",
       "- 다른 메시지에 더 신뢰할 수 있는 요일 단서가 있으면 원문 날짜는 유지하면서 suggestedDate에 YYYY-MM-DD를 넣는다.",
@@ -68,7 +103,7 @@
       "- confidence는 0 이상 1 이하 숫자다.",
       "",
       "출력 객체:",
-      '{"events":[{"title":"string","start":"ISO 8601","end":"ISO 8601","allDay":false,"location":"string","confidence":0.0,"warnings":["string"],"suggestedDate":"YYYY-MM-DD (선택)","sourceMsgIndex":0,"checklist":[{"text":"string","sourceMsgIndex":0}]}],"todos":[{"text":"string","sourceMsgIndex":0}],"summary":"N개 메시지에서 일정 N개, 할 일 N개를 찾았어요"}',
+      '{"events":[{"title":"string","audience":"all","audienceSourceMsgIndexes":[],"start":"ISO 8601","end":"ISO 8601","allDay":false,"location":"string","confidence":0.0,"warnings":["string"],"suggestedDate":"YYYY-MM-DD (선택)","sourceMsgIndex":0,"checklist":[{"text":"string","audience":["이름1"],"audienceSourceMsgIndexes":[0],"sourceMsgIndex":0}]}],"todos":[{"text":"string","audience":"team:1","audienceSourceMsgIndexes":[],"sourceMsgIndex":0}],"teams":[],"summary":"N개 메시지에서 일정 N개, 할 일 N개를 찾았어요"}',
       "",
       "메시지:",
       JSON.stringify(indexedMessages),
@@ -127,6 +162,8 @@
       seen[text] = true;
       result.push({
         text: text,
+        audience: normalizeAudience(item.audience),
+        audienceSourceMsgIndexes: audienceSources(item),
         sourceMsgIndex: Number.isInteger(item.sourceMsgIndex) ? item.sourceMsgIndex : -1
       });
       return result;
@@ -152,6 +189,8 @@
 
     return {
       title: title,
+      audience: normalizeAudience(event.audience),
+      audienceSourceMsgIndexes: audienceSources(event),
       start: start,
       end: end,
       allDay: allDay,
@@ -172,6 +211,8 @@
     if (!todo || typeof todo.text !== "string" || !todo.text.trim()) return null;
     return {
       text: todo.text.trim(),
+      audience: normalizeAudience(todo.audience),
+      audienceSourceMsgIndexes: audienceSources(todo),
       sourceMsgIndex: Number.isInteger(todo.sourceMsgIndex) ? todo.sourceMsgIndex : -1
     };
   }
@@ -196,6 +237,7 @@
     }
     return {
       events: events,
+      teams: Array.isArray(parsed.teams) ? parsed.teams : [],
       todos: parsed.todos.map(normalizeTodo).filter(Boolean),
       summary: typeof parsed.summary === "string" ? parsed.summary.trim() : ""
     };
@@ -247,6 +289,17 @@
         status: "success",
         message: "",
         events: normalized.events,
+        teams: normalized.teams.filter(function (team) {
+          var source = team && (options.messages || [])[team.sourceMsgIndex];
+          return source && Number.isInteger(team.team) && team.team > 0 &&
+            Array.isArray(team.names) && team.names.length > 0 &&
+            (new RegExp("(?:^|\\D)" + team.team + "\\s*(?:팀|조)|(?:팀|조)\\s*" + team.team + "(?:\\D|$)").test(source.text) ||
+              (/(?:팀|조)(?:\s*번호)?\s*[|\t,]/.test(source.text) && String(source.text).split(/\r?\n/).some(function (line) {
+                return new RegExp("^\\s*\\|?\\s*" + team.team + "\\s*[|\\t,]").test(line) &&
+                  team.names.every(function (name) { return typeof name === "string" && line.includes(normalizeName(name)); });
+              }))) &&
+            team.names.every(function (name) { return typeof name === "string" && normalizeName(name) && source.text.includes(normalizeName(name)); });
+        }).map(function (team) { return { team: team.team, names: team.names.map(normalizeName), sourceMsgIndex: team.sourceMsgIndex }; }),
         todos: normalized.todos,
         summary: normalized.summary
       };
@@ -257,6 +310,9 @@
 
   return {
     MODEL: MODEL,
+    normalizeName: normalizeName,
+    normalizeAudience: normalizeAudience,
+    isRelevant: isRelevant,
     buildPrompt: buildPrompt,
     extract: extract
   };

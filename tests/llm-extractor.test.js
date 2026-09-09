@@ -7,6 +7,52 @@ const vm = require("node:vm");
 const MODULE_PATH = "../llm-extractor.js";
 const ROOT = path.join(__dirname, "..");
 
+test("audience를 보존하고 이름·팀·전원 대상을 구분한다", async () => {
+  const llm = loadExtractor();
+  const messages = loadDoToDo().parseKakaoMessages(fs.readFileSync(path.join(ROOT, "data/trainthon-pc.txt"), "utf8"));
+  const badgeIndex = messages.findIndex(m => m.text.includes("[명찰 지참 대상]"));
+  const hoodieIndex = messages.findIndex(m => m.text.includes("대상자: 강지민"));
+  const payload = successfulPayload();
+  payload.events[0].audience = "all";
+  payload.events[0].checklist = [
+    { text: "명찰 지참 대상: 최신 배부 공지 확인", audience: ["신현우", "강다영"], sourceMsgIndex: badgeIndex },
+    { text: "후드집업 수령 대상", audience: ["강지민", "이지연", "김준서", "이지상"], sourceMsgIndex: hoodieIndex }
+  ];
+  payload.todos = [{ text: "멘토링 시트 확인", audience: "team:22", sourceMsgIndex: 0 }];
+  const result = await llm.extract({ apiKey: "test", messages, ruleResult: { events: [] }, fetchImpl: async () => ({
+    ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] })
+  }) });
+  assert.deepEqual(result.events[0].checklist[0].audience, ["신현우", "강다영"]);
+  assert.equal(llm.isRelevant(result.events[0], "신현우", []), true);
+  assert.equal(llm.isRelevant(result.events[0].checklist[0], "신현우_공과대", []), true);
+  assert.equal(llm.isRelevant(result.events[0].checklist[1], "신현우", []), false);
+  assert.equal(result.todos[0].audience, "team:22");
+  assert.equal(llm.isRelevant(result.todos[0], "신현우", [{ team: 22, names: ["신현우"] }]), true);
+  assert.equal(llm.isRelevant(result.todos[0], "신현우", []), false);
+  assert.equal(llm.isRelevant(result.todos[0], "", []), true);
+  assert.equal(llm.isRelevant({ audience: ["신현우"] }, "현우", []), false);
+});
+
+test("팀 배정은 원문에 이름과 팀 번호가 함께 확인될 때만 매핑한다", async () => {
+  const llm = loadExtractor();
+  const payload = { events: [], todos: [{ text: "멘토링 시트 확인", audience: "team:22", sourceMsgIndex: 0 }], teams: [
+    { team: 22, names: ["신현우"], sourceMsgIndex: 0 },
+    { team: 23, names: ["신현우"], sourceMsgIndex: 0 },
+    { team: 22, names: ["없는사람"], sourceMsgIndex: 0 }
+  ] };
+  const run = text => llm.extract({ apiKey: "fixture", messages: [{ text }], ruleResult: { events: [] }, fetchImpl: async () => ({
+    ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] })
+  }) });
+  const mapped = await run("22팀: 신현우, 강다영 — 멘토링 시트 확인");
+  assert.deepEqual(mapped.teams, [{ team: 22, names: ["신현우"], sourceMsgIndex: 0 }]);
+  assert.equal(llm.isRelevant(mapped.todos[0], "신현우", mapped.teams), true);
+  const table = await run("팀 | 이름\n22 | 신현우, 강다영");
+  assert.deepEqual(table.teams, [{ team: 22, names: ["신현우"], sourceMsgIndex: 0 }]);
+  const unknown = await run("멘토링 시트에서 팀 이름을 선택하세요. https://example.com/sheet");
+  assert.deepEqual(unknown.teams, []);
+  assert.equal(llm.isRelevant(unknown.todos[0], "신현우", unknown.teams), false);
+});
+
 function loadExtractor() {
   delete require.cache[require.resolve(MODULE_PATH)];
   return require(MODULE_PATH);

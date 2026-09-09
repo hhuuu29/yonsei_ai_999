@@ -59,6 +59,7 @@
       return {
         eventId: event.eventId,
         title: event.title,
+        audience: event.audience || "all",
         start: formatSeoulWallClock(event.start),
         end: formatSeoulWallClock(event.end),
         allDay: !!event.allDay,
@@ -73,9 +74,12 @@
     });
   }
 
-  function buildSystemPrompt(messages, events, todos) {
+  function buildSystemPrompt(messages, events, todos, userName, teams) {
     return [
       "당신은 두투두의 한국어 일정 비서다.",
+      "사용자 이름: " + (userName || "미선택"),
+      "확인된 팀 배정: " + JSON.stringify(teams || []),
+      "사용자가 나에게 해당하는 일을 물으면 audience와 팀 배정을 확인한다. 다른 사람 대상 공지를 사용자의 할 일로 안내하지 않는다.",
       "아래 원문 메시지, 현재 일정, 할 일만 근거로 질문에 답하거나 사용자의 지시를 구조화한다.",
       "근거가 있는 답변은 sourceMsgIndexes에 해당 원문 인덱스를 넣는다. 추측하지 않는다.",
       "지시는 실행하지 말고 다음 actions 중 필요한 것만 반환한다:",
@@ -209,7 +213,9 @@
                 text: buildSystemPrompt(
                   options.messages || [],
                   options.events || [],
-                  options.todos || []
+                  options.todos || [],
+                  options.userName || "",
+                  options.teams || []
                 )
               }]
             },

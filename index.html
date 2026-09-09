@@ -343,6 +343,20 @@
       clip: rect(0, 0, 0, 0);
       border: 0;
     }
+    .identity-chips { max-height: 150px; overflow-y: auto; }
+    .identity-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .identity-form input { min-width: 0; width: 160px; padding: 8px; border: 1px solid var(--hair); border-radius: 8px; font: inherit; }
+    .layer-title { font-size: 16px; margin: 12px 0; }
+    .audience-layer + .audience-layer { border-top: 1px solid var(--hair); margin-top: 24px; padding-top: 12px; }
+    .board-evidence { grid-column: 1 / -1; min-width: 0; }
+    .board-checklist { font-size: 13px; padding-top: 8px; }
+    .item-evidence .q { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow-y: auto; }
+    .my-name { font-weight: 700; }
+    .audience-evidence { margin-top: 12px; white-space: pre-wrap; }
+    #identityButton { display: inline-flex; max-width: 145px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .identity-form .pill { display: inline-flex; }
+    .board.open { z-index: 60; }
+    @media (max-width: 440px) { .top { flex-wrap: wrap; gap: 8px; } .top-actions { flex-wrap: wrap; } }
   </style>
   <style id="phase2-ui">
     :root {
@@ -766,6 +780,7 @@
     <header class="top">
       <div class="wm">두투두<small>단톡방을 캘린더로</small></div>
       <div class="top-actions">
+        <button type="button" class="pill" id="identityButton" aria-expanded="false">나: 선택</button>
         <button type="button" class="ai-badge" id="aiBadge" aria-controls="apiPanel" aria-expanded="false">AI 정제</button>
         <button type="button" class="pill" id="openBoard" aria-controls="board" aria-expanded="false">일정 <b id="mobileEventCount">0</b></button>
       </div>
