@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark" />
   <meta name="theme-color" content="#0f1720" media="(prefers-color-scheme: dark)" />
   <meta name="theme-color" content="#e8f0f4" media="(prefers-color-scheme: light)" />
-  <title>톡일정 — 카카오톡 → .ics</title>
+  <title>두투두 — 카카오톡 → 일정</title>
   <style>
     :root {
       --bg0: #e8f0f4;
@@ -348,8 +348,8 @@
 <body>
   <div class="app">
     <header>
-      <h1>톡일정</h1>
-      <p>카카오톡 대화보내기 텍스트에서 일정을 찾아 .ics로 저장합니다. 완전 오프라인.</p>
+      <h1>두투두</h1>
+      <p>카카오톡 대화에서 일정과 챙길 것을 정리합니다.</p>
     </header>
 
     <section class="panel" aria-label="대화 입력">
@@ -493,7 +493,7 @@
       .replace(/[^a-z0-9가-힣]+/gi, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 36);
-    return "talkcal-" + stamp + "-" + index + "-" + slug + "@talkcal.local";
+    return "dotodo-" + stamp + "-" + index + "-" + slug + "@dotodo.local";
   }
 
   /**
@@ -503,11 +503,11 @@
   function eventsToIcs(events, options) {
     options = options || {};
     var now = options.now instanceof Date ? options.now : new Date();
-    var calendarName = options.calendarName || "톡일정";
+    var calendarName = options.calendarName || "두투두";
     var lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//TalkCal//KO",
+      "PRODID:-//DoToDo//KO",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       "X-WR-CALNAME:" + escapeIcsText(calendarName),
@@ -670,7 +670,7 @@
     var patterns = [
       /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(\d{1,2})\s*분(?:\s*(?:까지|경))?/,
       /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*:\s*(\d{2})(?:\s*(?:까지|경))?/,
-      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시(?:\s*(?:까지|경))?/
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시(?!\s*간)(?:\s*(?:까지|경))?/
     ];
     for (var i = 0; i < patterns.length; i++) {
       var m = text.match(patterns[i]);
@@ -752,7 +752,11 @@
 
     // 9/9(수) or 9월 9일(수) or 2026년 9월 9일
     var abs = work.match(/(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일(?:\s*\(([월화수목금토일])\))?/);
-    if (!abs) abs = work.match(/(?:(\d{4})[.\-\/])?(\d{1,2})\s*[./\-]\s*(\d{1,2})(?:\s*\(([월화수목금토일])\))?/);
+    if (!abs) {
+      abs = work.match(
+        /(?:(\d{4})[.\-\/])?(\d{1,2})\s*[./\-]\s*(\d{1,2})(?:\s*\(([월화수목금토일])\))?(?!\s*\.)/
+      );
+    }
 
     if (abs) {
       var year = abs[1] ? Number(abs[1]) : ref.getFullYear();
@@ -855,7 +859,7 @@
   }
 
   function messageHasScheduleCue(text) {
-    return /(?:\d{1,2}\s*[./월]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|오늘|다음\s*주|이번\s*주|[월화수목금토일]요일|\d{1,2}\s*시|\d{1,2}\s*:\s*\d{2}|오전|오후|아침|저녁|밤)/.test(text);
+    return /(?:\d{1,2}\s*[./월]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|오늘|다음\s*주|이번\s*주|[월화수목금토일]요일|\d{1,2}\s*시(?!\s*간)|\d{1,2}\s*:\s*\d{2}|오전|오후|아침|저녁|밤)/.test(text);
   }
 
   /**
@@ -1010,7 +1014,7 @@
   }
 
   /* expose for debugging / Phase 2 */
-  window.TalkCal = {
+  window.DoToDo = {
     parseKakaoMessages: parseKakaoMessages,
     parseScheduleFromKakao: parseScheduleFromKakao,
     eventsToIcs: eventsToIcs,
@@ -1043,7 +1047,7 @@
   var stateEvents = [];
   var stateTodos = [];
   var extractionRunId = 0;
-  var API_KEY_STORAGE = "talkcal.geminiApiKey";
+  var API_KEY_STORAGE = "dotodo.geminiApiKey";
 
   function setStatus(msg, kind) {
     statusEl.textContent = msg || "";
@@ -1297,13 +1301,13 @@
         setLlmStatus("AI 비활성 · API 키 필요");
         return;
       }
-      if (!window.TalkCalLLM) {
+      if (!window.DoToDoLLM) {
         setLlmStatus("AI 모듈 없음 · 룰 결과 사용", "warn");
         return;
       }
 
       setLlmStatus("AI 정리 중…", "active");
-      var llmResult = await window.TalkCalLLM.extract({
+      var llmResult = await window.DoToDoLLM.extract({
         apiKey: apiKey,
         messages: result.messages,
         ruleResult: result
@@ -1351,12 +1355,12 @@
     try {
       var picked = selectedEvents();
       if (!picked.length) return;
-      var ics = eventsToIcs(picked, { calendarName: "톡일정" });
+      var ics = eventsToIcs(picked, { calendarName: "두투두" });
       var blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
       a.href = url;
-      a.download = "talkcal-" + formatIcsDate(new Date()) + ".ics";
+      a.download = "dotodo-" + formatIcsDate(new Date()) + ".ics";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1408,30 +1412,6 @@
     chatInput.focus();
   });
 
-  /* self-check (console) */
-  try {
-    var sample =
-      "--------------- 2026년 9월 9일 수요일 ---------------\n" +
-      "2026. 9. 9. 오전 8:13, 홍길동 : 내일 오후 3시 강릉역에서 만나자\n" +
-      "추가 안내: 2번 출구\n" +
-      "[김연세] [오후 2:05] 9/12(토) 저녁 7시 회의실 3층\n" +
-      "홍길동님이 들어왔습니다.\n" +
-      "사진\n" +
-      "2026. 9. 9. 오후 4:00, 이수 : 9/9(수) 오전 10시 미팅";
-    var check = parseScheduleFromKakao(sample);
-    var ics = eventsToIcs(check.events);
-    console.info(
-      "[톡일정] self-check:",
-      check.messages.length,
-      "msgs,",
-      check.events.length,
-      "events,",
-      (ics.match(/BEGIN:VEVENT/g) || []).length,
-      "vevents"
-    );
-  } catch (e) {
-    console.warn("[톡일정] self-check failed", e);
-  }
 })();
   </script>
 </body>

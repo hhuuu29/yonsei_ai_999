@@ -1,4 +1,4 @@
-# 톡일정 (TalkCal)
+# 두투두 (DoToDo)
 
 카카오톡 대화보내기 텍스트에서 일정을 추출해 `.ics`로 저장하는 오프라인 웹앱.
 
@@ -14,7 +14,7 @@
 - npm / 빌드 / 외부 라이브러리 / CDN / 네트워크 요청 없음
 - 일정 추출은 룰 기반만 (LLM 호출 없음)
 
-## 순수 함수 (`window.TalkCal`)
+## 순수 함수 (`window.DoToDo`)
 
 - `parseKakaoMessages(text)`
 - `parseScheduleFromKakao(text)`

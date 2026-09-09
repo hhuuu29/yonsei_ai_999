@@ -5,7 +5,7 @@
 
 ## 현재 상태 (Phase 1 완료, 커밋 7e22e0d)
 - index.html 단일 파일, 순수 JS, 외부 의존성 0
-- window.TalkCal 순수 함수: parseKakaoMessages / parseScheduleFromKakao / eventsToIcs
+- window.DoToDo 순수 함수: parseKakaoMessages / parseScheduleFromKakao / eventsToIcs
 - 룰 파서는 폰 포맷으로만 검증됨. PC 포맷은 미검증
 
 ## Phase 2 원칙

@@ -6,7 +6,7 @@
 
 ## 구조
 
-- `llm-extractor.js`는 일반 스크립트로 로드하며 `window.TalkCalLLM`을 제공한다.
+- `llm-extractor.js`는 일반 스크립트로 로드하며 `window.DoToDoLLM`을 제공한다.
 - 기본 모델은 한 줄 상수 `gemini-3-flash-preview`로 둔다.
 - Gemini 요청은 `responseMimeType: "application/json"`과 `thinkingConfig: { thinkingLevel: "low" }`를 사용하며 `temperature`는 보내지 않는다.
 - 응답은 `candidates[0].content.parts`의 `text` 필드만 이어 붙여 JSON으로 파싱한다.

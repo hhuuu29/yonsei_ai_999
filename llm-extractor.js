@@ -1,7 +1,7 @@
 (function (root, factory) {
   "use strict";
   var api = factory(root);
-  root.TalkCalLLM = api;
+  root.DoToDoLLM = api;
   if (typeof module === "object" && module.exports) module.exports = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function (root) {
   "use strict";
@@ -60,6 +60,7 @@
       "- '~지참', '~해주세요', '~확인 부탁' 같은 지시는 별도 일정으로 만들지 말고 관련 일정 checklist에 넣는다.",
       "- 같은 주제의 공지가 바뀌면 가장 최신 내용을 사용하고 checklist 문구 끝에 '(MM/DD HH:MM 변경)'을 붙인다.",
       "- 어느 일정에도 붙일 수 없는 지시는 todos로 분리한다.",
+      "- '신청/접수/제출 기간 N일~M일 X시까지'처럼 기간이 있는 마감성 공지는 기간 일정으로 만들지 않는다. 마지막 날 X시의 단일 일정으로 만들고 제목에 '마감'을 포함한다.",
       "- 일정 개수에는 제한이 없다. 각 일정의 checklist만 중요도순 최대 7개다.",
       "- sourceMsgIndex는 아래 메시지 배열의 인덱스를 그대로 사용한다.",
       "- start/end는 ISO 8601 형식으로 작성한다. 시간이 있는 일정은 +09:00 오프셋을 포함하고, allDay 일정은 YYYY-MM-DD만 사용한다.",
@@ -98,7 +99,7 @@
     if (allDay && dateOnly) {
       parsed = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
     } else if (!allDay && seoulDateTime) {
-      // TalkCal stores Seoul wall-clock fields in local Date objects before adding TZID.
+      // DoToDo stores Seoul wall-clock fields in local Date objects before adding TZID.
       parsed = new Date(
         Number(seoulDateTime[1]),
         Number(seoulDateTime[2]) - 1,

@@ -24,7 +24,7 @@ function ruleFallback() {
   };
 }
 
-function loadTalkCal() {
+function loadDoToDo() {
   const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
   const script = html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
   const element = () => ({
@@ -53,7 +53,7 @@ function loadTalkCal() {
   };
   vm.createContext(context);
   vm.runInContext(script, context);
-  return context.window.TalkCal;
+  return context.window.DoToDo;
 }
 
 function successfulPayload() {
@@ -143,8 +143,8 @@ function successfulPayload() {
 }
 
 test("두 export의 mock 성공 응답에서 text parts만 파싱하고 요구 결과를 보존한다", async () => {
-  const TalkCalLLM = loadExtractor();
-  const TalkCal = loadTalkCal();
+  const DoToDoLLM = loadExtractor();
+  const DoToDo = loadDoToDo();
   const payload = successfulPayload();
   const json = JSON.stringify(payload);
   const datasets = [
@@ -154,10 +154,10 @@ test("두 export의 mock 성공 응답에서 text parts만 파싱하고 요구 �
 
   for (const [relativePath, expectedMessageCount] of datasets) {
     const text = fs.readFileSync(path.join(ROOT, relativePath), "utf8");
-    const ruleResult = TalkCal.parseScheduleFromKakao(text);
+    const ruleResult = DoToDo.parseScheduleFromKakao(text);
     assert.equal(ruleResult.messages.length, expectedMessageCount);
     let request;
-    const result = await TalkCalLLM.extract({
+    const result = await DoToDoLLM.extract({
       apiKey: "test-key",
       messages: ruleResult.messages,
       ruleResult,
@@ -209,7 +209,7 @@ test("두 export의 mock 성공 응답에서 text parts만 파싱하고 요구 �
   const invalidPayload = successfulPayload();
   invalidPayload.events[0].start = "2026-09-08T23:30:00Z";
   const fallback = ruleFallback();
-  const invalidResult = await TalkCalLLM.extract({
+  const invalidResult = await DoToDoLLM.extract({
     apiKey: "test-key",
     messages: [],
     ruleResult: fallback,
@@ -226,9 +226,9 @@ test("두 export의 mock 성공 응답에서 text parts만 파싱하고 요구 �
 });
 
 test("429 응답은 잠시 후 다시 시도 상태와 룰 결과를 반환한다", async () => {
-  const TalkCalLLM = loadExtractor();
+  const DoToDoLLM = loadExtractor();
   const fallback = ruleFallback();
-  const result = await TalkCalLLM.extract({
+  const result = await DoToDoLLM.extract({
     apiKey: "test-key",
     messages: [],
     ruleResult: fallback,
@@ -241,10 +241,10 @@ test("429 응답은 잠시 후 다시 시도 상태와 룰 결과를 반환한�
 });
 
 test("API 키가 없으면 호출 없이 룰 파서 결과로 폴백한다", async () => {
-  const TalkCalLLM = loadExtractor();
+  const DoToDoLLM = loadExtractor();
   const fallback = ruleFallback();
   let called = false;
-  const result = await TalkCalLLM.extract({
+  const result = await DoToDoLLM.extract({
     apiKey: "",
     messages: [],
     ruleResult: fallback,
