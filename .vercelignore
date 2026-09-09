@@ -1,6 +1,7 @@
 .git/
 .worktrees/
-data/
+data/*
+!data/trainthon-pc.txt
 design/
 docs/
 tests/

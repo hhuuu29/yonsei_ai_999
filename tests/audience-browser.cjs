@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const server = http.createServer((req, res) => {
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
-  if (!['index.html', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js'].includes(file)) {
+  if (!['index.html', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js', 'data/trainthon-pc.txt'].includes(file)) {
     res.writeHead(404).end(); return;
   }
   res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8');
@@ -24,6 +24,7 @@ const server = http.createServer((req, res) => {
     page.on('pageerror', error => errors.push(error.message));
     await page.route('https://accounts.google.com/**', route => route.abort());
     let assistantPrompt = '';
+    let extractionGate = null;
     await page.route('https://generativelanguage.googleapis.com/**', async route => {
       const body = route.request().postDataJSON();
       let result;
@@ -31,6 +32,7 @@ const server = http.createServer((req, res) => {
         assistantPrompt = body.systemInstruction.parts[0].text;
         result = { reply: '명찰 안내를 확인하세요.', sourceMsgIndexes: [], actions: [], suggestedQuestions: ['기차 시간은?', '다른 준비물은?'] };
       } else {
+        if (extractionGate) await extractionGate;
         const prompt = body.contents[0].parts[0].text;
         const messages = JSON.parse(prompt.split('\n메시지:\n')[1].split('\n\n룰 파서 후보:')[0]);
         const badge = messages.findIndex(m => m.text.includes('[명찰 지참 대상]'));
@@ -49,9 +51,31 @@ const server = http.createServer((req, res) => {
     await page.goto(origin);
     await page.evaluate(() => localStorage.setItem('dotodo.geminiApiKey', 'fixture-key'));
     await page.reload();
+    await page.route('**/data/trainthon-pc.txt', route => route.fulfill({ status: 404, body: '' }));
+    await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
+    await page.getByText('데모 파일을 불러오지 못했어요. 다시 눌러주세요.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).isEnabled(), true);
+    await page.unroute('**/data/trainthon-pc.txt');
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const heights = await page.locator('.compose .att, .compose .in, .compose .send').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
+      assert.deepEqual(heights, [44, 44, 44]);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
     for (const file of ['trainthon-pc.txt', 'trainthon-mobile.txt']) {
-      await page.locator('#fileInput').setInputFiles(path.join(root, 'data', file));
+      let release;
+      extractionGate = new Promise(resolve => { release = resolve; });
+      if (file === 'trainthon-pc.txt') {
+        await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
+      } else {
+        await page.locator('#fileInput').setInputFiles(path.join(root, 'data', file));
+      }
+      await page.getByText(`${file === 'trainthon-pc.txt' ? 36 : 26}개 메시지 읽는 중…`, { exact: true }).waitFor();
+      assert.equal(await page.locator('#extractionLoading i').count(), 3);
+      release();
+      extractionGate = null;
       await page.getByText('AI 정제가 끝났어요.', { exact: true }).waitFor();
+      assert.equal(await page.locator('#extractionLoading').count(), 0);
       await page.getByText('이 방에서 당신은 누구예요?', { exact: true }).waitFor();
       assert.ok(await page.locator('.identity-chips button').count() > 0);
       await page.locator('#identityName').fill('신현우');
@@ -82,8 +106,13 @@ const server = http.createServer((req, res) => {
     const selected = await page.locator('#identityButton').innerText();
     await page.reload();
     assert.equal(await page.locator('#identityButton').innerText(), selected);
+    await page.route('https://generativelanguage.googleapis.com/**', route => route.fulfill({ status: 429, body: '{}' }));
+    await page.getByRole('button', { name: '데모: 트레인톤 단톡방 불러오기', exact: true }).click();
+    await page.getByText('잠시 후 다시 시도', { exact: true }).waitFor();
+    assert.equal(await page.locator('#extractionLoading').count(), 0);
+    assert.ok(await page.locator('#chat .event-stack .ev').count() > 0);
     assert.deepEqual(errors, []);
-    console.log('PASS: both exports, name picker/storage/change/clear, board layers, evidence highlight, assistant identity, mobile layout');
+    console.log('PASS: demo fetch/retry, 44px composer, extraction loading/success/429 fallback, both exports, identity, board layers, evidence, mobile');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

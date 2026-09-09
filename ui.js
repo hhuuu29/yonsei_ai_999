@@ -197,6 +197,8 @@
   var identityButton = document.getElementById("identityButton");
 
   var state = {
+    extracting: false,
+    demoLoading: false,
     userName: "",
     nameDraft: null,
     choosingName: false,
@@ -400,6 +402,31 @@
       "msg bot",
       "안녕하세요, 두투두예요. 카카오톡 대화 내보내기 파일을 보내주시면 일정과 챙길 것을 정리해드릴게요."
     ));
+    if (!state.fileName) {
+      var chips = element("div", "chips");
+      var demo = element("button", "", "데모: 트레인톤 단톡방 불러오기");
+      demo.type = "button";
+      demo.disabled = state.demoLoading;
+      demo.addEventListener("click", async function () {
+        if (state.demoLoading) return;
+        var previousRun = state.runId;
+        state.demoLoading = true;
+        demo.disabled = true;
+        try {
+          var response = await root.fetch("data/trainthon-pc.txt");
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          var text = await response.text();
+          if (previousRun === state.runId) await processChat(text, "trainthon-pc.txt");
+        } catch (error) {
+          if (previousRun === state.runId) setStatus("데모 파일을 불러오지 못했어요. 다시 눌러주세요.", "warn");
+        } finally {
+          state.demoLoading = false;
+          demo.disabled = false;
+        }
+      });
+      chips.appendChild(demo);
+      chat.appendChild(chips);
+    }
   }
 
   function addFileBubble() {
@@ -644,6 +671,20 @@
       return;
     }
     addFileBubble();
+    if (state.extracting) {
+      var loading = element("div", "msg bot loading");
+      loading.id = "extractionLoading";
+      loading.setAttribute("role", "status");
+      loading.appendChild(element("span", "", state.messages.length + "개 메시지 읽는 중…"));
+      for (var dot = 0; dot < 3; dot += 1) {
+        var indicator = element("i");
+        indicator.setAttribute("aria-hidden", "true");
+        loading.appendChild(indicator);
+      }
+      chat.appendChild(loading);
+      chat.scrollTop = chat.scrollHeight;
+      return;
+    }
     chat.appendChild(element("div", "msg bot", state.summary));
     var stackMessage = element("div", "msg wide");
     var stack = element("div", "event-stack");
@@ -788,9 +829,9 @@
     state.summary =
       state.messages.length + "개 메시지에서 일정 " + state.events.length +
       "개를 찾았어요. AI 정제를 켜면 노이즈와 최신 공지를 더 정확히 정리해요.";
-    renderAll();
-
     var apiKey = apiKeyInput.value.trim();
+    state.extracting = !!(apiKey && llm);
+    renderAll();
     if (!apiKey || !llm) {
       setStatus("룰 파서 결과를 표시 중이에요.", "");
       return;
@@ -803,6 +844,7 @@
       ruleResult: ruleResult
     });
     if (runId !== state.runId) return;
+    state.extracting = false;
     if (result.status === "success") {
       state.events = enrichLlmEvents(result.events);
       state.todos = result.todos;
@@ -811,7 +853,6 @@
         (state.messages.length + "개 메시지에서 일정 " + state.events.length +
         "개, 할 일 " + state.todos.length + "개를 찾았어요.");
       setStatus("AI 정제가 끝났어요.", "ok");
-      renderAll();
     } else if (result.status === "rate_limited") {
       setStatus("잠시 후 다시 시도", "warn");
       apiPanel.hidden = false;
@@ -819,6 +860,7 @@
     } else {
       setStatus(result.message || "AI 정제에 실패해 룰 파서 결과를 유지합니다.", "warn");
     }
+    renderAll();
   }
 
   function looksLikeKakaoExport(text) {
