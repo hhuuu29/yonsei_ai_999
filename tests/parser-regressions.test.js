@@ -50,3 +50,17 @@ test("목록 번호와 기간 표현을 일정 날짜·시각으로 오인하지
   assert.equal(result.messages.length, 1);
   assert.equal(result.events.length, 0);
 });
+
+test("일정 알림은 ICS VALARM으로 내보낸다", () => {
+  const parser = loadParser();
+  const ics = parser.eventsToIcs([{
+    title: "멘토링",
+    start: new Date(2026, 8, 9, 20, 0),
+    end: new Date(2026, 8, 9, 20, 50),
+    reminders: [30]
+  }], { now: new Date(2026, 8, 9, 12, 0) });
+
+  assert.match(ics, /BEGIN:VALARM\r\n/);
+  assert.match(ics, /TRIGGER:-PT30M\r\n/);
+  assert.match(ics, /ACTION:DISPLAY\r\n/);
+});

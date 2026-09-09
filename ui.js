@@ -16,7 +16,13 @@
   }
 
   function prepareEvents(events) {
-    return (events || []).map(function (event) {
+    return (events || []).map(function (event, index) {
+      if (!event.eventId) {
+        event.eventId = event.uid || (
+          "event-" + index + "-" +
+          (event.start instanceof Date && !isNaN(event.start.getTime()) ? event.start.getTime() : "undated")
+        );
+      }
       if (typeof event.confidence === "number" && event.confidence < 0.6) {
         event.selected = false;
       } else if (event.selected !== false) {
@@ -24,6 +30,76 @@
       }
       return event;
     });
+  }
+
+  function parseSeoulDateTime(value) {
+    var match = String(value || "").match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?\+09:?00$/
+    );
+    if (!match) return null;
+    var date = new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4]),
+      Number(match[5]),
+      Number(match[6] || 0)
+    );
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  function applyAssistantActions(events, actions) {
+    var changed = {};
+    var exportAll = false;
+    (actions || []).forEach(function (action) {
+      if (!action || action.type === "exportAll") {
+        if (action && action.type === "exportAll") exportAll = true;
+        return;
+      }
+      var event = (events || []).find(function (candidate) {
+        return candidate.eventId === action.eventId;
+      });
+      if (!event) return;
+      if (action.type === "setTime") {
+        var start = parseSeoulDateTime(action.start);
+        var end = parseSeoulDateTime(action.end);
+        if (!start || !end || end <= start) return;
+        event.start = start;
+        event.end = end;
+        event.allDay = false;
+      } else if (action.type === "addReminder") {
+        var minutes = Number(action.minutesBefore);
+        if (!isFinite(minutes) || minutes < 0) return;
+        event.reminders = Array.isArray(event.reminders) ? event.reminders : [];
+        if (event.reminders.indexOf(Math.round(minutes)) < 0) {
+          event.reminders.push(Math.round(minutes));
+          event.reminders.sort(function (a, b) { return a - b; });
+        }
+      } else if (action.type === "toggleInclude") {
+        event.selected = !!action.included;
+      } else if (action.type === "applySuggestedDate") {
+        var target = event.suggestedDate && String(event.suggestedDate).match(
+          /^(\d{4})-(\d{2})-(\d{2})$/
+        );
+        if (!target || !(event.start instanceof Date)) return;
+        var duration = event.end instanceof Date ? event.end - event.start : 3600000;
+        event.start = new Date(
+          Number(target[1]),
+          Number(target[2]) - 1,
+          Number(target[3]),
+          event.start.getHours(),
+          event.start.getMinutes(),
+          event.start.getSeconds()
+        );
+        event.end = new Date(event.start.getTime() + duration);
+        event.suggestedDate = undefined;
+        event.warnings = [];
+      } else {
+        return;
+      }
+      changed[event.eventId] = true;
+    });
+    return { changedEventIds: Object.keys(changed), exportAll: exportAll };
   }
 
   function parseDocumentMessages(text, fileName, today) {
@@ -62,13 +138,15 @@
     return {
       confidenceDots: confidenceDots,
       prepareEvents: prepareEvents,
-      parseDocumentMessages: parseDocumentMessages
+      parseDocumentMessages: parseDocumentMessages,
+      applyAssistantActions: applyAssistantActions
     };
   }
 
   var document = root.document;
   var core = root.DoToDo;
   var llm = root.DoToDoLLM;
+  var assistant = root.DoToDoAssistant;
   if (!core) return { confidenceDots: confidenceDots, prepareEvents: prepareEvents };
 
   var chat = document.getElementById("chat");
@@ -82,6 +160,7 @@
   var fileInput = document.getElementById("fileInput");
   var composer = document.getElementById("composer");
   var composerInput = document.getElementById("composerInput");
+  var sendButton = document.getElementById("sendButton");
   var aiBadge = document.getElementById("aiBadge");
   var apiPanel = document.getElementById("apiPanel");
   var apiKeyInput = document.getElementById("apiKeyInput");
@@ -96,7 +175,11 @@
     fileName: "",
     sourceKind: "chat",
     summary: "",
-    runId: 0
+    runId: 0,
+    conversation: [],
+    history: [],
+    assistantBusy: false,
+    assistantRequestId: 0
   };
 
   function element(tag, className, text) {
@@ -250,6 +333,7 @@
     var classes = ["ev"];
     if (event.warnings && event.warnings.length) classes.push("flag");
     if (typeof event.confidence === "number" && event.confidence < 0.6) classes.push("dim");
+    if (event._flash) classes.push("flash");
     var card = element("article", classes.join(" "));
     card.dataset.eventIndex = String(index);
 
@@ -277,6 +361,11 @@
     details.appendChild(element("span", "t num", event.allDay ? "시간 미정" : formatTime(event.start)));
     var extra = [];
     if (event.location) extra.push(event.location);
+    if (event.reminders && event.reminders.length) {
+      extra.push(event.reminders.map(function (minutes) {
+        return "알림 " + minutes + "분 전";
+      }).join(" · "));
+    }
     if (boardMode && event.checklist && event.checklist.length) {
       extra.push("챙길 것 " + event.checklist.length);
     }
@@ -350,10 +439,75 @@
     chat.appendChild(bubble);
   }
 
+  function addAnswerEvidence(container, sourceIndex, answerIndex, evidenceIndex) {
+    var source = state.messages[sourceIndex];
+    var button = element("button", "src", "근거");
+    button.type = "button";
+    var quoteId = "answer-evidence-" + answerIndex + "-" + evidenceIndex;
+    button.setAttribute("aria-controls", quoteId);
+    button.setAttribute("aria-expanded", "false");
+    var quote = element("div", "q");
+    quote.id = quoteId;
+    var who = element("div", "who");
+    who.appendChild(element("b", "", source && source.speaker ? source.speaker : "발신자 미상"));
+    who.appendChild(document.createTextNode(" " + formatMessageTime(source && source.sentAt)));
+    quote.appendChild(who);
+    highlightSource(quote, source && source.text, "");
+    button.addEventListener("click", function () {
+      var open = quote.classList.toggle("on");
+      button.textContent = open ? "닫기" : "근거";
+      button.setAttribute("aria-expanded", String(open));
+    });
+    container.appendChild(button);
+    container.appendChild(quote);
+  }
+
+  function renderConversation() {
+    state.conversation.forEach(function (entry, index) {
+      if (entry.role === "loading") {
+        var loading = element("div", "msg bot loading");
+        loading.setAttribute("aria-label", "두투두가 답변을 작성 중");
+        loading.appendChild(element("i"));
+        loading.appendChild(element("i"));
+        loading.appendChild(element("i"));
+        chat.appendChild(loading);
+        return;
+      }
+      if (entry.role === "user") {
+        chat.appendChild(element("div", "msg me", entry.text));
+        return;
+      }
+      var bubble = element("div", "msg bot");
+      bubble.appendChild(document.createTextNode(entry.text));
+      if (entry.sourceMsgIndexes && entry.sourceMsgIndexes.length) {
+        var sources = element("div", "answer-sources");
+        entry.sourceMsgIndexes.forEach(function (sourceIndex, evidenceIndex) {
+          addAnswerEvidence(sources, sourceIndex, index, evidenceIndex);
+        });
+        bubble.appendChild(sources);
+      }
+      chat.appendChild(bubble);
+      if (entry.suggestedQuestions && entry.suggestedQuestions.length) {
+        var chips = element("div", "chips");
+        entry.suggestedQuestions.forEach(function (question) {
+          var chip = element("button", "", question);
+          chip.type = "button";
+          chip.addEventListener("click", function () { sendQuestion(question); });
+          chips.appendChild(chip);
+        });
+        chat.appendChild(chips);
+      }
+    });
+  }
+
   function renderChat() {
     chat.innerHTML = "";
     addGreeting();
-    if (!state.fileName) return;
+    if (!state.fileName) {
+      renderConversation();
+      chat.scrollTop = chat.scrollHeight;
+      return;
+    }
     addFileBubble();
     chat.appendChild(element("div", "msg bot", state.summary));
     var stackMessage = element("div", "msg wide");
@@ -367,6 +521,7 @@
     state.events.forEach(function (event, index) {
       if (event.checklist && event.checklist.length) addChecklistBubble(event, index);
     });
+    renderConversation();
     chat.scrollTop = chat.scrollHeight;
   }
 
@@ -427,6 +582,13 @@
 
   async function processChat(raw, fileName) {
     var runId = ++state.runId;
+    var isNewSource = raw !== state.raw || fileName !== state.fileName;
+    if (isNewSource) {
+      state.conversation = [];
+      state.history = [];
+      state.assistantBusy = false;
+      state.assistantRequestId += 1;
+    }
     var ruleResult;
     try {
       var kakaoMessages = core.parseKakaoMessages(raw);
@@ -523,6 +685,78 @@
     setStatus(picked.length + "개 일정을 .ics로 저장했어요.", "ok");
   }
 
+  async function sendQuestion(value) {
+    var question = String(value || "").trim();
+    if (!question || state.assistantBusy) return;
+    composerInput.value = "";
+    sendButton.disabled = true;
+    state.conversation.push({ role: "user", text: question });
+
+    if (!state.raw) {
+      state.conversation.push({
+        role: "assistant",
+        text: "먼저 카톡 export나 회의록을 보내주세요",
+        sourceMsgIndexes: [],
+        suggestedQuestions: []
+      });
+      renderChat();
+      return;
+    }
+    if (!assistant) {
+      state.conversation.push({
+        role: "assistant",
+        text: "챗 비서 모듈을 불러오지 못했어요.",
+        sourceMsgIndexes: [],
+        suggestedQuestions: []
+      });
+      renderChat();
+      return;
+    }
+
+    var loadingEntry = { role: "loading" };
+    state.conversation.push(loadingEntry);
+    state.assistantBusy = true;
+    var assistantRequestId = ++state.assistantRequestId;
+    var sourceRunId = state.runId;
+    renderChat();
+    var previousHistory = state.history.slice();
+    var result = await assistant.ask({
+      apiKey: apiKeyInput.value.trim(),
+      userText: question,
+      messages: state.messages,
+      events: state.events,
+      todos: state.todos,
+      history: previousHistory
+    });
+    if (assistantRequestId !== state.assistantRequestId || sourceRunId !== state.runId) return;
+    state.assistantBusy = false;
+    var loadingIndex = state.conversation.indexOf(loadingEntry);
+    var responseEntry = {
+      role: "assistant",
+      text: result.reply,
+      sourceMsgIndexes: result.sourceMsgIndexes || [],
+      suggestedQuestions: result.suggestedQuestions || []
+    };
+    if (loadingIndex >= 0) state.conversation.splice(loadingIndex, 1, responseEntry);
+    else state.conversation.push(responseEntry);
+    state.history.push({ role: "user", text: question });
+    state.history.push({ role: "assistant", text: result.reply });
+
+    var applied = applyAssistantActions(state.events, result.actions || []);
+    applied.changedEventIds.forEach(function (eventId) {
+      var event = state.events.find(function (candidate) { return candidate.eventId === eventId; });
+      if (event) event._flash = true;
+    });
+    renderAll();
+    if (applied.exportAll) downloadIcs();
+    if (applied.changedEventIds.length) {
+      setTimeout(function () {
+        state.events.forEach(function (event) { event._flash = false; });
+        renderAll();
+      }, 1400);
+    }
+  }
+
   fileInput.addEventListener("change", function () {
     var file = fileInput.files && fileInput.files[0];
     if (!file) return;
@@ -543,7 +777,19 @@
     processChat(text, "붙여넣은 카카오톡 대화.txt");
   });
 
-  composer.addEventListener("submit", function (event) { event.preventDefault(); });
+  composerInput.addEventListener("input", function () {
+    sendButton.disabled = !composerInput.value.trim() || state.assistantBusy;
+  });
+  composerInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendQuestion(composerInput.value);
+    }
+  });
+  composer.addEventListener("submit", function (event) {
+    event.preventDefault();
+    sendQuestion(composerInput.value);
+  });
   var boardReturnFocus = null;
 
   function openMobileBoard() {
@@ -619,6 +865,7 @@
     confidenceDots: confidenceDots,
     prepareEvents: prepareEvents,
     parseDocumentMessages: parseDocumentMessages,
+    applyAssistantActions: applyAssistantActions,
     processChat: processChat
   };
 });
