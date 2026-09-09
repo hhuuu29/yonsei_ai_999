@@ -583,28 +583,33 @@
   }
 
   function findTime(text) {
+    // Prefer Korean clock phrases (supports "오전 8시 30분까지")
     var patterns = [
-      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(\d{1,2})\s*분\s*(경)?/,
-      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*:\s*(\d{2})\s*(경)?/,
-      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(경)?/
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(\d{1,2})\s*분(?:\s*(?:까지|경))?/,
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*:\s*(\d{2})(?:\s*(?:까지|경))?/,
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시(?:\s*(?:까지|경))?/
     ];
     for (var i = 0; i < patterns.length; i++) {
       var m = text.match(patterns[i]);
       if (!m) continue;
       var clock;
-      if (i === 2) clock = parseClock(m[1], m[2], 0, m[3]);
-      else clock = parseClock(m[1], m[2], m[3], m[4]);
+      if (i === 2) clock = parseClock(m[1], m[2], 0, /경/.test(m[0]));
+      else clock = parseClock(m[1], m[2], m[3], /경/.test(m[0]));
       if (!clock) continue;
       return { clock: clock, match: m[0], index: m.index };
     }
-    // 20:00 style without am/pm already covered; bare 24h
-    var mil = text.match(/\b([01]?\d|2[0-3])\s*:\s*([0-5]\d)\b/);
+    // 24h "15:37" — require 2-digit minutes so "1:1 멘토링" is not a time
+    var mil = text.match(/(?:^|[^\d])([01]?\d|2[0-3]):([0-5]\d)(?:\s*(?:까지|경))?(?!\d)/);
     if (mil) {
-      return {
-        clock: { h: Number(mil[1]), m: Number(mil[2]), approx: false },
-        match: mil[0],
-        index: mil.index
-      };
+      var idx = mil.index + (mil[0].match(/^\d/) ? 0 : 1);
+      var matched = text.slice(idx).match(/^([01]?\d|2[0-3]):([0-5]\d)(?:\s*(?:까지|경))?/);
+      if (matched) {
+        return {
+          clock: { h: Number(matched[1]), m: Number(matched[2]), approx: /경/.test(matched[0]) },
+          match: matched[0],
+          index: idx
+        };
+      }
     }
     return null;
   }
@@ -693,6 +698,20 @@
       return { dateInfo: result, warnings: warnings, rest: stripOnce(work, abs.index, abs[0].length) };
     }
 
+    // Bare weekday: "목요일 15:37" → upcoming that weekday from message date (today inclusive)
+    var bareWd = work.match(/([월화수목금토일])요일/);
+    if (bareWd) {
+      var target = WEEKDAY_KO[bareWd[1]];
+      var cur = ref.getDay();
+      var delta = (target - cur + 7) % 7;
+      result = {
+        date: addDays(ref, delta),
+        match: bareWd[0],
+        index: bareWd.index
+      };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, bareWd.index, bareWd[0].length) };
+    }
+
     return { dateInfo: null, warnings: warnings, rest: work };
   }
 
@@ -725,54 +744,64 @@
   }
 
   function messageHasScheduleCue(text) {
-    return /(?:\d{1,2}\s*[./월]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|오늘|다음\s*주|이번\s*주|\d{1,2}\s*시|\d{1,2}\s*:\s*\d{2}|오전|오후|저녁)/.test(text);
+    return /(?:\d{1,2}\s*[./월]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|오늘|다음\s*주|이번\s*주|[월화수목금토일]요일|\d{1,2}\s*시|\d{1,2}\s*:\s*\d{2}|오전|오후|아침|저녁|밤)/.test(text);
   }
 
-  function extractEventFromMessage(msg) {
-    var text = String(msg.text || "").trim();
+  /**
+   * Extract a single event from one schedule line/snippet. Pure.
+   * @returns {object|null}
+   */
+  function extractEventFromLine(line, msg) {
+    var text = String(line || "").trim();
     if (!text || !messageHasScheduleCue(text)) return null;
 
     var dateRes = extractDate(text, msg.date || msg.sentAt || new Date());
     var timeRes = findTime(dateRes.rest);
     var work = dateRes.rest;
-    var timeMatch = "";
     if (timeRes) {
-      timeMatch = timeRes.match;
       work = stripOnce(work, timeRes.index, timeRes.match.length);
     }
 
-    // Need at least a date OR a time (time alone → use message date)
+    // Require a date cue, or time-only falling back to message send date
     if (!dateRes.dateInfo && !timeRes) return null;
 
-    var eventDate = dateRes.dateInfo ? dateRes.dateInfo.date : startOfDay(msg.date || msg.sentAt || new Date());
-    // If only time on message date, still an event
+    // Skip lines that only have a weak cue in prose without date/time pair,
+    // unless time alone on a dated message context
     if (!dateRes.dateInfo && timeRes) {
-      // ok
-    } else if (!dateRes.dateInfo) {
-      return null;
+      // time-only OK
     }
+
+    var eventDate = dateRes.dateInfo
+      ? dateRes.dateInfo.date
+      : startOfDay(msg.date || msg.sentAt || new Date());
 
     var loc = extractLocation(work);
     var workBeforeLoc = work;
     if (loc.match) work = work.replace(loc.match, " ");
 
-    // Strip leftover time/place connectors (avoid bare "에" — it breaks "에서")
     work = work
       .replace(/(오전|오후|아침|저녁|밤|에서|으로|까지|부터)/g, " ")
       .replace(/(^|[\s])(경|로)(?=[\s]|$)/g, " ")
-      .replace(/[~\-–—:;]/g, " ")
+      .replace(/[~\-–—]/g, " ")
+      .replace(/(^|[\s])[:;]+|[:;]+(?=[\s]|$)/g, " ")
       .replace(/\s{2,}/g, " ")
       .trim();
 
-    // Title from first line remainder; full message stays in description
     var title = summarizeTitle(work.split("\n")[0] || work);
     if (!title || title === "일정") {
-      title = summarizeTitle((workBeforeLoc.split("\n")[0] || workBeforeLoc || loc.location || "일정"));
+      title = summarizeTitle(workBeforeLoc.split("\n")[0] || workBeforeLoc || loc.location || "일정");
     }
+
+    // Avoid treating intro lines without real schedule as events:
+    // e.g. "트레인톤 일정 공유합니다!" has no date/time
+    if (!dateRes.dateInfo && !timeRes) return null;
+
     var allDay = !timeRes;
     var start;
     var end;
     if (allDay) {
+      // Date-only lines without time → all-day; but intro text with date cue only is rare
+      if (!dateRes.dateInfo) return null;
       start = startOfDay(eventDate);
       end = addDays(eventDate, 1);
     } else {
@@ -802,20 +831,58 @@
     };
   }
 
+  /**
+   * One Kakao message may contain multiple schedule lines. Pure.
+   * @returns {object[]}
+   */
+  function extractEventsFromMessage(msg) {
+    var full = String(msg.text || "").trim();
+    if (!full) return [];
+
+    var lines = full.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var found = [];
+    var seen = {};
+
+    function pushEv(ev) {
+      if (!ev || !(ev.start instanceof Date) || isNaN(ev.start.getTime())) return;
+      var key = ev.start.getTime() + "|" + ev.title + "|" + (ev.location || "");
+      if (seen[key]) return;
+      seen[key] = true;
+      found.push(ev);
+    }
+
+    lines.forEach(function (line) {
+      pushEv(extractEventFromLine(line, msg));
+    });
+
+    // Fallback: whole message as one blob (single-line exports)
+    if (!found.length) {
+      pushEv(extractEventFromLine(full, msg));
+    }
+
+    return found;
+  }
+
+  /** @deprecated use extractEventsFromMessage — kept for Phase 2 compat */
+  function extractEventFromMessage(msg) {
+    var list = extractEventsFromMessage(msg);
+    return list.length ? list[0] : null;
+  }
+
   function parseScheduleFromKakao(text) {
     var messages = parseKakaoMessages(text);
     var events = [];
     var warnings = [];
     messages.forEach(function (msg) {
       try {
-        var ev = extractEventFromMessage(msg);
-        if (ev) {
+        var extracted = extractEventsFromMessage(msg);
+        extracted.forEach(function (ev) {
           ev.uid = makeUid(ev, events.length);
           events.push(ev);
           if (ev.warnings && ev.warnings.length) {
             warnings = warnings.concat(ev.warnings);
           }
-        }
+        });
       } catch (err) {
         warnings.push("메시지 처리 중 오류: " + (err && err.message ? err.message : String(err)));
       }
@@ -828,7 +895,8 @@
     parseKakaoMessages: parseKakaoMessages,
     parseScheduleFromKakao: parseScheduleFromKakao,
     eventsToIcs: eventsToIcs,
-    extractEventFromMessage: extractEventFromMessage
+    extractEventFromMessage: extractEventFromMessage,
+    extractEventsFromMessage: extractEventsFromMessage
   };
 
   /* ========================================================================
