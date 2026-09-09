@@ -394,7 +394,7 @@
       padding: 14px 18px 10px;
       border-bottom: 1px solid var(--hair);
       background: var(--bg);
-      z-index: 20;
+      z-index: 50;
     }
     .wm { font-size: 22px; font-weight: 800; letter-spacing: -.05em; }
     .wm small {
@@ -447,10 +447,24 @@
       color: var(--ink);
       padding: 10px 11px;
     }
+    .api-panel .remember {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin: 9px 1px 0;
+      color: var(--ink-2);
+      font-size: 12.5px;
+    }
+    .api-panel .remember input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: var(--teal);
+    }
     .app-status {
-      position: absolute;
-      top: calc(100% + 8px);
-      left: 16px;
+      position: fixed;
+      right: 16px;
+      bottom: calc(76px + env(safe-area-inset-bottom));
       z-index: 40;
       max-width: calc(100vw - 32px);
       min-height: 18px;
@@ -714,12 +728,16 @@
     <header class="top">
       <div class="wm">두투두<small>단톡방을 캘린더로</small></div>
       <div class="top-actions">
-        <button type="button" class="ai-badge" id="aiBadge" aria-expanded="false">AI 정제</button>
+        <button type="button" class="ai-badge" id="aiBadge" aria-controls="apiPanel" aria-expanded="false">AI 정제</button>
         <button type="button" class="pill" id="openBoard" aria-controls="board" aria-expanded="false">일정 <b id="mobileEventCount">0</b></button>
       </div>
       <div class="api-panel" id="apiPanel" hidden>
-        <label for="apiKeyInput">Gemini API 키 · 이 탭의 sessionStorage에만 저장</label>
+        <label for="apiKeyInput">Gemini API 키</label>
         <input id="apiKeyInput" type="password" autocomplete="off" placeholder="API 키 입력" />
+        <label class="remember">
+          <input id="rememberApiKey" type="checkbox" checked />
+          이 브라우저에 기억
+        </label>
       </div>
       <div class="app-status" id="status" role="status" aria-live="polite"></div>
     </header>

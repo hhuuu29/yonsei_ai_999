@@ -11,7 +11,7 @@
 ## Phase 2 원칙
 - 프레임워크 마이그레이션 금지. 순수 JS, 모듈 파일만 추가
 - Phase 1 순수 함수는 오프라인 폴백으로 유지
-- API 키는 UI 입력 → sessionStorage. 코드/레포에 절대 넣지 않음
+- API 키는 UI 입력 → 기본 localStorage, "이 브라우저에 기억"을 끄면 sessionStorage. 코드/레포에 절대 넣지 않음
 - 디자인은 design/mockup.html이 정답. 색·타이포·레이아웃 그대로
 - 기능 하나 끝날 때마다 main에 직접 커밋. PR 금지
 

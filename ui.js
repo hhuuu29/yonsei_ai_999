@@ -26,8 +26,44 @@
     });
   }
 
+  function parseDocumentMessages(text, fileName, today) {
+    var fallback = today instanceof Date ? today : new Date();
+    var date = new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
+    var match = String(fileName || "").match(/(?:^|\D)(\d{2})(\d{2})(\d{2})(?:\D|$)/);
+    if (match) {
+      var candidate = new Date(2000 + Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      if (
+        candidate.getFullYear() === 2000 + Number(match[1]) &&
+        candidate.getMonth() === Number(match[2]) - 1 &&
+        candidate.getDate() === Number(match[3])
+      ) {
+        date = candidate;
+      }
+    }
+    return String(text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split(/\n\s*\n+/)
+      .map(function (paragraph) { return paragraph.trim(); })
+      .filter(Boolean)
+      .map(function (paragraph) {
+        var messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        return {
+          sender: "문서",
+          speaker: "문서",
+          sentAt: new Date(messageDate.getTime()),
+          date: messageDate,
+          text: paragraph
+        };
+      });
+  }
+
   if (!root.document) {
-    return { confidenceDots: confidenceDots, prepareEvents: prepareEvents };
+    return {
+      confidenceDots: confidenceDots,
+      prepareEvents: prepareEvents,
+      parseDocumentMessages: parseDocumentMessages
+    };
   }
 
   var document = root.document;
@@ -49,6 +85,7 @@
   var aiBadge = document.getElementById("aiBadge");
   var apiPanel = document.getElementById("apiPanel");
   var apiKeyInput = document.getElementById("apiKeyInput");
+  var rememberApiKey = document.getElementById("rememberApiKey");
   var status = document.getElementById("status");
 
   var state = {
@@ -57,6 +94,7 @@
     messages: [],
     raw: "",
     fileName: "",
+    sourceKind: "chat",
     summary: "",
     runId: 0
   };
@@ -121,9 +159,16 @@
     );
   }
 
-  function getStoredApiKey() {
+  function loadStoredApiKey() {
     try {
-      return root.sessionStorage.getItem(API_KEY_STORAGE) || "";
+      var remembered = root.localStorage.getItem(API_KEY_STORAGE) || "";
+      if (remembered) {
+        rememberApiKey.checked = true;
+        return remembered;
+      }
+      var sessionKey = root.sessionStorage.getItem(API_KEY_STORAGE) || "";
+      rememberApiKey.checked = !sessionKey;
+      return sessionKey;
     } catch (error) {
       return "";
     }
@@ -131,8 +176,16 @@
 
   function storeApiKey(value) {
     try {
-      if (value) root.sessionStorage.setItem(API_KEY_STORAGE, value);
-      else root.sessionStorage.removeItem(API_KEY_STORAGE);
+      if (!value) {
+        root.localStorage.removeItem(API_KEY_STORAGE);
+        root.sessionStorage.removeItem(API_KEY_STORAGE);
+      } else if (rememberApiKey.checked) {
+        root.localStorage.setItem(API_KEY_STORAGE, value);
+        root.sessionStorage.removeItem(API_KEY_STORAGE);
+      } else {
+        root.sessionStorage.setItem(API_KEY_STORAGE, value);
+        root.localStorage.removeItem(API_KEY_STORAGE);
+      }
     } catch (error) {
       setStatus("이 브라우저에서는 API 키를 세션에 저장할 수 없어요.", "warn");
     }
@@ -162,7 +215,12 @@
     bubble.appendChild(element("div", "ico"));
     var copy = element("div");
     copy.appendChild(element("b", "", state.fileName));
-    copy.appendChild(element("span", "", state.messages.length + "개 메시지"));
+    copy.appendChild(element(
+      "span",
+      "",
+      (state.sourceKind === "document" ? "회의록/문서" : "카카오톡 대화") +
+      " · " + state.messages.length + "개 메시지"
+    ));
     bubble.appendChild(copy);
     chat.appendChild(bubble);
     var now = new Date();
@@ -371,7 +429,18 @@
     var runId = ++state.runId;
     var ruleResult;
     try {
-      ruleResult = core.parseScheduleFromKakao(raw);
+      var kakaoMessages = core.parseKakaoMessages(raw);
+      if (kakaoMessages.length) {
+        ruleResult = core.parseScheduleFromKakao(raw);
+        state.sourceKind = "chat";
+      } else {
+        ruleResult = {
+          messages: parseDocumentMessages(raw, fileName, new Date()),
+          events: [],
+          warnings: []
+        };
+        state.sourceKind = "document";
+      }
     } catch (error) {
       setStatus("대화 파일을 읽지 못했어요: " + error.message, "warn");
       return;
@@ -534,18 +603,22 @@
     storeApiKey(apiKeyInput.value.trim());
     updateAiBadge();
   });
+  rememberApiKey.addEventListener("change", function () {
+    storeApiKey(apiKeyInput.value.trim());
+  });
   apiKeyInput.addEventListener("change", function () {
     if (state.raw && apiKeyInput.value.trim()) processChat(state.raw, state.fileName);
   });
   btnExport.addEventListener("click", downloadIcs);
 
-  apiKeyInput.value = getStoredApiKey();
+  apiKeyInput.value = loadStoredApiKey();
   updateAiBadge();
   renderAll();
 
   return {
     confidenceDots: confidenceDots,
     prepareEvents: prepareEvents,
+    parseDocumentMessages: parseDocumentMessages,
     processChat: processChat
   };
 });

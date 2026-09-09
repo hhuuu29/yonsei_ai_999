@@ -26,7 +26,7 @@
 **Files:**
 - Modify: `index.html`
 
-1. API 키 입력과 sessionStorage 저장, LLM 활성 상태를 추가한다.
+1. API 키 입력과 localStorage/sessionStorage 저장 선택, LLM 활성 상태를 추가한다.
 2. 룰 결과 즉시 렌더링 후 자동 LLM 추출을 연결한다.
 3. 429 상태 문구와 todos 표시를 연결한다.
 4. checklist와 정리 메시지를 ICS DESCRIPTION에 추가하되 기존 `eventsToIcs(events, options)` 호출을 유지한다.
