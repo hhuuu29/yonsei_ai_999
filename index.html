@@ -3,939 +3,1106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="light" />
-  <meta name="theme-color" content="#0b1f2a" />
-  <title>CalPass — 텍스트를 일정으로</title>
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#0f1720" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#e8f0f4" media="(prefers-color-scheme: light)" />
+  <title>톡일정 — 카카오톡 → .ics</title>
   <style>
     :root {
-      --ink: #0b1f2a;
-      --ink-soft: #1a3544;
-      --mist: #d7e6ef;
-      --fog: #eef5f8;
-      --paper: #f7fbfc;
-      --line: rgba(11, 31, 42, 0.12);
-      --signal: #e85d04;
-      --signal-deep: #c44d00;
-      --sea: #2a6f7f;
-      --sea-bright: #3d8fa3;
-      --ok: #1f7a4c;
-      --warn: #9a6700;
-      --shadow: 0 18px 50px rgba(11, 31, 42, 0.14);
-      --radius: 18px;
-      --font-display: "Avenir Next", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-      --font-body: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Segoe UI", sans-serif;
-      --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+      --bg0: #e8f0f4;
+      --bg1: #f4f8fa;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-solid: #ffffff;
+      --ink: #12202a;
+      --muted: #4a6170;
+      --line: rgba(18, 32, 42, 0.12);
+      --accent: #0f7a6c;
+      --accent-hover: #0b6358;
+      --warn: #9a5b00;
+      --warn-bg: rgba(154, 91, 0, 0.1);
+      --danger: #b42318;
+      --shadow: 0 12px 40px rgba(18, 32, 42, 0.1);
+      --radius: 16px;
+      --font: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Segoe UI", sans-serif;
+      --mono: "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg0: #0f1720;
+        --bg1: #15212c;
+        --surface: rgba(28, 40, 52, 0.88);
+        --surface-solid: #1c2834;
+        --ink: #e8f0f4;
+        --muted: #9bb0bd;
+        --line: rgba(232, 240, 244, 0.12);
+        --accent: #3dbead;
+        --accent-hover: #5ed0c0;
+        --warn: #f0b429;
+        --warn-bg: rgba(240, 180, 41, 0.12);
+        --danger: #ff7b72;
+        --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      }
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html, body { margin: 0; }
     body {
-      margin: 0;
       min-height: 100dvh;
+      font-family: var(--font);
       color: var(--ink);
-      font-family: var(--font-body);
-      line-height: 1.5;
       background:
-        radial-gradient(1200px 700px at 12% -10%, rgba(61, 143, 163, 0.28), transparent 55%),
-        radial-gradient(900px 600px at 100% 8%, rgba(232, 93, 4, 0.16), transparent 50%),
-        linear-gradient(165deg, #c9dde8 0%, var(--fog) 38%, var(--paper) 100%);
+        radial-gradient(900px 500px at 0% 0%, rgba(15, 122, 108, 0.14), transparent 55%),
+        radial-gradient(700px 420px at 100% 10%, rgba(61, 110, 160, 0.12), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
       background-attachment: fixed;
+      line-height: 1.45;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    .rail {
-      position: fixed;
-      inset: 0 auto 0 0;
-      width: 6px;
-      background: linear-gradient(180deg, var(--sea-bright), var(--ink) 45%, var(--signal));
-      opacity: 0.85;
-      pointer-events: none;
-    }
-
-    .wrap {
-      width: min(920px, calc(100% - 2rem));
+    .app {
+      width: min(760px, 100%);
       margin: 0 auto;
-      padding: 1.25rem 0 4rem;
+      padding: 1rem 1rem 5.5rem;
     }
 
-    .hero {
-      min-height: min(72dvh, 640px);
-      display: grid;
-      align-content: end;
-      gap: 1.1rem;
-      padding: 2.5rem 0 2rem;
-      animation: rise 0.8s ease-out both;
+    header {
+      padding: 0.75rem 0 1rem;
     }
-
-    .brand {
+    header h1 {
       margin: 0;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: clamp(3.2rem, 14vw, 5.6rem);
-      letter-spacing: -0.06em;
-      line-height: 0.92;
-      color: var(--ink);
+      font-size: clamp(1.8rem, 7vw, 2.4rem);
+      letter-spacing: -0.04em;
+      line-height: 1.1;
     }
-
-    .brand span {
-      display: inline-block;
-      color: var(--sea);
-      animation: slideIn 0.9s 0.15s ease-out both;
-    }
-
-    .tagline {
-      margin: 0;
-      max-width: 22rem;
-      font-size: 1.05rem;
-      color: var(--ink-soft);
-      opacity: 0.9;
-      animation: rise 0.8s 0.2s ease-out both;
-    }
-
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      animation: rise 0.8s 0.35s ease-out both;
-    }
-
-    .btn {
-      appearance: none;
-      border: 0;
-      border-radius: 999px;
-      padding: 0.85rem 1.25rem;
-      font: inherit;
-      font-weight: 650;
-      cursor: pointer;
-      transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-    }
-    .btn:active { transform: translateY(1px) scale(0.98); }
-    .btn-primary {
-      background: var(--signal);
-      color: #fff;
-      box-shadow: 0 10px 24px rgba(232, 93, 4, 0.28);
-    }
-    .btn-primary:hover { background: var(--signal-deep); }
-    .btn-ghost {
-      background: rgba(255, 255, 255, 0.55);
-      color: var(--ink);
-      border: 1px solid var(--line);
-      backdrop-filter: blur(8px);
-    }
-    .btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
-    section {
-      margin-top: 1.75rem;
-      animation: rise 0.7s ease-out both;
-    }
-
-    .section-head h2 {
-      margin: 0 0 0.35rem;
-      font-family: var(--font-display);
-      font-size: 1.55rem;
-      letter-spacing: -0.03em;
-    }
-    .section-head p {
-      margin: 0 0 1rem;
-      color: var(--ink-soft);
-      opacity: 0.85;
+    header p {
+      margin: 0.4rem 0 0;
+      color: var(--muted);
       font-size: 0.95rem;
     }
 
     .panel {
-      background: rgba(255, 255, 255, 0.72);
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      backdrop-filter: blur(12px);
       box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
       overflow: hidden;
     }
 
-    textarea {
+    #chatInput {
       display: block;
       width: 100%;
-      min-height: 220px;
-      padding: 1.1rem 1.15rem;
+      min-height: 42vh;
+      max-height: 70vh;
+      padding: 1rem;
       border: 0;
       resize: vertical;
       background: transparent;
       color: var(--ink);
       font: inherit;
-      font-size: 1rem;
+      font-size: 0.98rem;
       line-height: 1.55;
       outline: none;
     }
+    #chatInput::placeholder { color: var(--muted); opacity: 0.8; }
 
-    .toolbar {
+    .row {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.6rem;
-      padding: 0.85rem 1rem 1rem;
+      gap: 0.55rem;
+      align-items: center;
+      padding: 0.75rem;
       border-top: 1px solid var(--line);
-      background: rgba(247, 251, 252, 0.8);
+      background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
     }
 
-    .meta {
-      margin-left: auto;
-      align-self: center;
-      font-size: 0.82rem;
-      color: var(--sea);
-      font-variant-numeric: tabular-nums;
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 0.78rem 1rem;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease, opacity 0.12s ease;
     }
-
-    .events {
-      display: grid;
-      gap: 0.85rem;
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #06221e;
     }
-
-    .event {
-      padding: 1rem 1.1rem;
-      background: rgba(255, 255, 255, 0.78);
+    @media (prefers-color-scheme: light) {
+      .btn-primary { color: #fff; }
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--ink);
       border: 1px solid var(--line);
-      border-radius: 14px;
-      animation: rise 0.45s ease-out both;
     }
-    .event h3 {
-      margin: 0 0 0.45rem;
-      font-size: 1.05rem;
-      letter-spacing: -0.02em;
+    .btn-file {
+      position: relative;
+      overflow: hidden;
     }
-    .event dl {
-      margin: 0;
-      display: grid;
-      gap: 0.25rem;
-      font-size: 0.9rem;
-      color: var(--ink-soft);
-    }
-    .event dt {
-      display: none;
-    }
-    .event dd {
-      margin: 0;
-    }
-    .event .when::before { content: "⏱ "; }
-    .event .where::before { content: "📍 "; }
-    .empty {
-      padding: 1.4rem 1.1rem;
-      color: var(--ink-soft);
-      opacity: 0.8;
-      font-size: 0.95rem;
+    .btn-file input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
     }
 
     .status {
       min-height: 1.25rem;
-      margin: 0.65rem 0 0;
+      margin: 0.7rem 0 0;
       font-size: 0.88rem;
+      color: var(--muted);
     }
-    .status.ok { color: var(--ok); }
+    .status.ok { color: var(--accent); }
     .status.warn { color: var(--warn); }
-    .status.err { color: #b42318; }
+    .status.err { color: var(--danger); }
 
-    details.samples {
-      margin-top: 0.85rem;
-    }
-    details.samples summary {
-      cursor: pointer;
-      color: var(--sea);
-      font-weight: 600;
-      font-size: 0.92rem;
-    }
-    .sample-list {
+    .section-title {
       display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 0.65rem;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin: 1.5rem 0 0.75rem;
     }
-    .chip {
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.65);
-      border-radius: 999px;
-      padding: 0.45rem 0.8rem;
-      font: inherit;
+    .section-title h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+    .section-title span {
+      color: var(--muted);
       font-size: 0.85rem;
-      cursor: pointer;
     }
 
-    footer {
-      margin-top: 2.5rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--line);
+    .cards {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.85rem 0.9rem;
+      box-shadow: var(--shadow);
+    }
+    .card.unchecked { opacity: 0.55; }
+    .card-top {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.65rem;
+      align-items: start;
+    }
+    .card input[type="checkbox"] {
+      width: 1.15rem;
+      height: 1.15rem;
+      margin-top: 0.35rem;
+      accent-color: var(--accent);
+    }
+    .fields {
+      display: grid;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+    .field {
+      display: grid;
+      gap: 0.15rem;
+    }
+    .field label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .field input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.5rem 0.65rem;
+      background: var(--surface-solid);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.95rem;
+    }
+    .field input:focus {
+      outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+      outline-offset: 1px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.45rem;
+    }
+    @media (max-width: 420px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    .meta {
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px dashed var(--line);
       font-size: 0.82rem;
-      color: var(--ink-soft);
-      opacity: 0.85;
+      color: var(--muted);
+      word-break: break-word;
+    }
+    .meta strong {
+      color: var(--ink);
+      font-weight: 650;
+    }
+    .warn-badge {
+      display: inline-block;
+      margin-top: 0.4rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 8px;
+      background: var(--warn-bg);
+      color: var(--warn);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .empty {
+      padding: 1.25rem 1rem;
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.95rem;
     }
 
-    code {
-      font-family: var(--font-mono);
-      font-size: 0.86em;
-      background: rgba(11, 31, 42, 0.06);
-      padding: 0.1em 0.35em;
-      border-radius: 6px;
+    .export-bar {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+      margin: 1rem -1rem -1rem;
+      padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom));
+      background: color-mix(in srgb, var(--bg1) 82%, transparent);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    .export-bar .btn {
+      width: 100%;
+      padding: 0.95rem 1rem;
+      border-radius: 14px;
+      font-size: 1rem;
     }
 
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(14px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-12px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    @media (min-width: 720px) {
-      .hero { min-height: min(68dvh, 560px); padding-top: 4rem; }
-      .brand { font-size: 5.4rem; }
-      .layout {
-        display: grid;
-        grid-template-columns: 1.15fr 0.85fr;
-        gap: 1.25rem;
-        align-items: start;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        animation: none !important;
-        transition: none !important;
-      }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
     }
   </style>
 </head>
 <body>
-  <div class="rail" aria-hidden="true"></div>
-  <div class="wrap">
-    <header class="hero">
-      <h1 class="brand">Cal<span>Pass</span></h1>
-      <p class="tagline">붙여넣은 일정을 오프라인에서 바로 <code>.ics</code>로. 네트워크 없이, 파일 하나로.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="#composer">일정 붙여넣기</a>
-        <button type="button" class="btn btn-ghost" id="btn-sample">샘플 채우기</button>
-      </div>
+  <div class="app">
+    <header>
+      <h1>톡일정</h1>
+      <p>카카오톡 대화보내기 텍스트에서 일정을 찾아 .ics로 저장합니다. 완전 오프라인.</p>
     </header>
 
-    <div class="layout">
-      <section id="composer" aria-labelledby="compose-title">
-        <div class="section-head">
-          <h2 id="compose-title">일정 텍스트</h2>
-          <p>날짜·시간·제목·장소가 섞인 메모를 넣으면 규칙 기반 파서가 이벤트로 나눕니다.</p>
-        </div>
-        <div class="panel">
-          <label class="visually-hidden" for="input" style="position:absolute;left:-9999px">일정 원문</label>
-          <textarea id="input" spellcheck="false" placeholder="예)
-2026-09-09 14:00–16:00 트레인톤 킥오프 @강릉
-9월 10일 오전 10시 멘토링 / 연세대 창업지원단
-…"></textarea>
-          <div class="toolbar">
-            <button type="button" class="btn btn-primary" id="btn-parse">파싱하기</button>
-            <button type="button" class="btn btn-ghost" id="btn-clear">비우기</button>
-            <span class="meta" id="char-count">0자</span>
-          </div>
-        </div>
-        <p class="status" id="status" role="status" aria-live="polite"></p>
-        <details class="samples">
-          <summary>다른 샘플 형식</summary>
-          <div class="sample-list" id="sample-list"></div>
-        </details>
-      </section>
+    <section class="panel" aria-label="대화 입력">
+      <label class="sr-only" for="chatInput">카카오톡 대화 텍스트</label>
+      <textarea
+        id="chatInput"
+        spellcheck="false"
+        placeholder="카카오톡 ‘대화 내용 내보내기’ .txt를 붙여넣거나 업로드하세요.
 
-      <section aria-labelledby="preview-title">
-        <div class="section-head">
-          <h2 id="preview-title">이벤트 미리보기</h2>
-          <p>확인 후 캘린더 파일로 저장하세요. Phase 2에서 같은 파서를 Google Calendar에 재사용합니다.</p>
-        </div>
-        <div id="preview" class="events" aria-live="polite">
-          <div class="empty">아직 파싱된 이벤트가 없습니다.</div>
-        </div>
-        <div class="cta-row" style="margin-top:1rem">
-          <button type="button" class="btn btn-primary" id="btn-download" disabled>ICS 다운로드</button>
-          <button type="button" class="btn btn-ghost" id="btn-copy" disabled>ICS 복사</button>
-        </div>
-      </section>
+예)
+--------------- 2026년 9월 9일 수요일 ---------------
+2026. 9. 9. 오전 8:13, 홍길동 : 내일 오후 3시 강릉역에서 만나자
+[김연세] [오후 2:05] 9/12(토) 저녁 7시 회의실 3층"
+      ></textarea>
+      <div class="row">
+        <label class="btn btn-secondary btn-file">
+          .txt 업로드
+          <input id="fileInput" type="file" accept=".txt,text/plain" />
+        </label>
+        <button type="button" class="btn btn-secondary" id="btnClear">비우기</button>
+        <button type="button" class="btn btn-primary" id="btnFind">일정 찾기</button>
+      </div>
+    </section>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+
+    <div class="section-title">
+      <h2>추출된 일정</h2>
+      <span id="countLabel">0개</span>
+    </div>
+    <div id="cards" class="cards" aria-live="polite">
+      <div class="empty">아직 추출된 일정이 없습니다.</div>
     </div>
 
-    <footer>
-      Phase 1 · 순수 JS · 네트워크 요청 0 · 파서/ICS는 순수 함수(<code>parseSchedule</code>, <code>eventsToIcs</code>)로 분리되어 Phase 2에서 그대로 재사용합니다.
-    </footer>
+    <div class="export-bar">
+      <button type="button" class="btn btn-primary" id="btnExport" disabled>
+        선택한 일정 .ics로 내보내기
+      </button>
+    </div>
   </div>
 
   <script>
-    /* ========================================================================
-     * CalPass core — Phase 1 pure functions (reuse in Phase 2)
-     * Export surface for later modules:
-     *   parseSchedule(text, options?) -> { events, warnings }
-     *   eventsToIcs(events, options?) -> string
-     * ======================================================================== */
+(function () {
+  "use strict";
 
-    /**
-     * @typedef {Object} CalEvent
-     * @property {string} uid
-     * @property {string} title
-     * @property {Date} start
-     * @property {Date} end
-     * @property {string} [location]
-     * @property {string} [description]
-     * @property {boolean} [allDay]
-     */
+  /* ========================================================================
+   * Pure helpers — KakaoTalk parse + schedule extract + ICS
+   * ======================================================================== */
 
-    const WEEKDAY_KO = {
-      "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6
-    };
+  var WEEKDAY_KO = { "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6 };
+  var WEEKDAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+  var IGNORE_LINE_RE = /(님이\s*(들어왔습니다|나갔습니다)|^(사진|동영상|파일|이모티콘|음성메시지|삭제된\s*메시지)$|메시지가\s*삭제되었습니다|톡게시판|'.*'님이)/;
 
-    /** @param {string} s */
-    function pad2(s) {
-      return String(s).padStart(2, "0");
+  function pad2(n) {
+    return String(n).padStart(2, "0");
+  }
+
+  function cloneDate(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+  }
+
+  function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function addDays(d, n) {
+    var x = startOfDay(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  }
+
+  function escapeIcsText(value) {
+    return String(value == null ? "" : value)
+      .replace(/\\/g, "\\\\")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,")
+      .replace(/\r\n|\n|\r/g, "\\n");
+  }
+
+  function foldIcsLine(line) {
+    var max = 75;
+    if (line.length <= max) return line;
+    var out = "";
+    var rest = line;
+    while (rest.length > max) {
+      out += rest.slice(0, max) + "\r\n ";
+      rest = rest.slice(max);
     }
+    return out + rest;
+  }
 
-    /** Escape text for ICS TEXT values (RFC 5545). Pure. */
-    function escapeIcsText(value) {
-      return String(value ?? "")
-        .replace(/\\/g, "\\\\")
-        .replace(/;/g, "\\;")
-        .replace(/,/g, "\\,")
-        .replace(/\r\n|\n|\r/g, "\\n");
-    }
+  function formatIcsLocal(dt) {
+    return (
+      dt.getFullYear() +
+      pad2(dt.getMonth() + 1) +
+      pad2(dt.getDate()) +
+      "T" +
+      pad2(dt.getHours()) +
+      pad2(dt.getMinutes()) +
+      pad2(dt.getSeconds())
+    );
+  }
 
-    /** Fold long ICS lines to 75 octets (approx for ASCII-heavy content). Pure. */
-    function foldIcsLine(line) {
-      const max = 75;
-      if (line.length <= max) return line;
-      let out = "";
-      let rest = line;
-      while (rest.length > max) {
-        out += rest.slice(0, max) + "\r\n ";
-        rest = rest.slice(max);
-      }
-      return out + rest;
-    }
+  function formatIcsDate(dt) {
+    return dt.getFullYear() + pad2(dt.getMonth() + 1) + pad2(dt.getDate());
+  }
 
-    /**
-     * Format Date as UTC ICS timestamp: YYYYMMDDTHHMMSSZ. Pure.
-     * @param {Date} date
-     */
-    function toIcsUtc(date) {
-      return (
-        date.getUTCFullYear() +
-        pad2(date.getUTCMonth() + 1) +
-        pad2(date.getUTCDate()) +
-        "T" +
-        pad2(date.getUTCHours()) +
-        pad2(date.getUTCMinutes()) +
-        pad2(date.getUTCSeconds()) +
-        "Z"
-      );
-    }
+  function formatIcsUtcStamp(dt) {
+    return (
+      dt.getUTCFullYear() +
+      pad2(dt.getUTCMonth() + 1) +
+      pad2(dt.getUTCDate()) +
+      "T" +
+      pad2(dt.getUTCHours()) +
+      pad2(dt.getUTCMinutes()) +
+      pad2(dt.getUTCSeconds()) +
+      "Z"
+    );
+  }
 
-    /**
-     * Format local all-day date: YYYYMMDD. Pure.
-     * @param {Date} date
-     */
-    function toIcsDateLocal(date) {
-      return (
-        date.getFullYear() +
-        pad2(date.getMonth() + 1) +
-        pad2(date.getDate())
-      );
-    }
+  function makeUid(event, index) {
+    var stamp = event.start ? formatIcsLocal(event.start) : "nodate";
+    var slug = String(event.title || "event")
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]+/gi, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 36);
+    return "talkcal-" + stamp + "-" + index + "-" + slug + "@talkcal.local";
+  }
 
-    /**
-     * Build a stable-ish UID from event fields. Pure.
-     * @param {Omit<CalEvent, "uid"> & { uid?: string }} event
-     * @param {number} index
-     */
-    function makeUid(event, index) {
-      if (event.uid) return event.uid;
-      const stamp = event.start instanceof Date ? toIcsUtc(event.start) : "nodate";
-      const slug = String(event.title || "event")
-        .toLowerCase()
-        .replace(/[^a-z0-9가-힣]+/gi, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 40);
-      return "calpass-" + stamp + "-" + index + "-" + slug + "@calpass.local";
-    }
-
-    /**
-     * Convert events to an iCalendar document string. Pure.
-     * @param {CalEvent[]} events
-     * @param {{ calendarName?: string, productId?: string, now?: Date }} [options]
-     * @returns {string}
-     */
-    function eventsToIcs(events, options) {
-      const opts = options || {};
-      const now = opts.now instanceof Date ? opts.now : new Date();
-      const productId = opts.productId || "-//CalPass//EN";
-      const calendarName = opts.calendarName || "CalPass";
-      const lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:" + productId,
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        "X-WR-CALNAME:" + escapeIcsText(calendarName)
-      ];
-
-      (events || []).forEach(function (ev, i) {
-        if (!ev || !(ev.start instanceof Date) || isNaN(ev.start.getTime())) return;
-        const end = ev.end instanceof Date && !isNaN(ev.end.getTime())
-          ? ev.end
-          : new Date(ev.start.getTime() + 60 * 60 * 1000);
-        const uid = makeUid(ev, i);
-        lines.push("BEGIN:VEVENT");
-        lines.push("UID:" + uid);
-        lines.push("DTSTAMP:" + toIcsUtc(now));
-        if (ev.allDay) {
-          const dayEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + (end <= ev.start ? 1 : 0));
-          lines.push("DTSTART;VALUE=DATE:" + toIcsDateLocal(ev.start));
-          lines.push("DTEND;VALUE=DATE:" + toIcsDateLocal(dayEnd));
-        } else {
-          lines.push("DTSTART:" + toIcsUtc(ev.start));
-          lines.push("DTEND:" + toIcsUtc(end));
-        }
-        lines.push("SUMMARY:" + escapeIcsText(ev.title || "Untitled"));
-        if (ev.location) lines.push("LOCATION:" + escapeIcsText(ev.location));
-        if (ev.description) lines.push("DESCRIPTION:" + escapeIcsText(ev.description));
-        lines.push("END:VEVENT");
-      });
-
-      lines.push("END:VCALENDAR");
-      return lines.map(foldIcsLine).join("\r\n") + "\r\n";
-    }
-
-    /**
-     * Parse hour/minute from Korean or numeric time token. Pure.
-     * @param {string} raw
-     * @param {string} [ampmHint]
-     * @returns {{ h: number, m: number } | null}
-     */
-    function parseTimeToken(raw, ampmHint) {
-      if (!raw) return null;
-      let text = String(raw).trim();
-      let ampm = ampmHint || "";
-      const ampmMatch = text.match(/(오전|오후|AM|PM|am|pm)/);
-      if (ampmMatch) {
-        ampm = ampmMatch[1];
-        text = text.replace(ampmMatch[0], "").trim();
-      }
-
-      let h = null;
-      let m = 0;
-      const colon = text.match(/^(\d{1,2})\s*[:：]\s*(\d{1,2})$/);
-      const korean = text.match(/^(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?$/);
-      const bare = text.match(/^(\d{1,2})$/);
-      if (colon) {
-        h = Number(colon[1]);
-        m = Number(colon[2]);
-      } else if (korean) {
-        h = Number(korean[1]);
-        m = korean[2] ? Number(korean[2]) : 0;
-      } else if (bare) {
-        h = Number(bare[1]);
-      } else {
-        return null;
-      }
-      if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-
-      const isPm = /오후|PM|pm/.test(ampm);
-      const isAm = /오전|AM|am/.test(ampm);
-      if (isPm && h < 12) h += 12;
-      if (isAm && h === 12) h = 0;
-      return { h: h, m: m };
-    }
-
-    /**
-     * Resolve a date from Korean / numeric fragments. Pure.
-     * @param {object} parts
-     * @param {Date} ref
-     * @returns {Date | null}
-     */
-    function resolveDate(parts, ref) {
-      const base = ref instanceof Date ? new Date(ref.getTime()) : new Date();
-      let y = parts.year != null ? Number(parts.year) : base.getFullYear();
-      let mo = parts.month != null ? Number(parts.month) : null;
-      let d = parts.day != null ? Number(parts.day) : null;
-
-      if (parts.weekday && (mo == null || d == null)) {
-        const target = WEEKDAY_KO[parts.weekday];
-        if (target == null) return null;
-        const cur = base.getDay();
-        let delta = (target - cur + 7) % 7;
-        if (delta === 0 && parts.preferNext) delta = 7;
-        const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta);
-        return dt;
-      }
-
-      if (mo == null || d == null) return null;
-      if (y < 100) y += 2000;
-      mo = mo - 1;
-      if (mo < 0 || mo > 11 || d < 1 || d > 31) return null;
-      const dt = new Date(y, mo, d);
-      if (dt.getMonth() !== mo || dt.getDate() !== d) return null;
-      return dt;
-    }
-
-    /**
-     * Extract location from trailing @ / 장소: patterns. Pure.
-     * @param {string} line
-     * @returns {{ text: string, location: string }}
-     */
-    function extractLocation(line) {
-      let text = line;
-      let location = "";
-      const at = text.match(/\s+@\s*(.+)$/);
-      if (at) {
-        location = at[1].trim();
-        text = text.slice(0, at.index).trim();
-      }
-      const place = text.match(/(?:장소|위치)\s*[:：]\s*(.+)$/);
-      if (place) {
-        location = place[1].trim();
-        text = text.slice(0, place.index).trim();
-      }
-      return { text: text, location: location };
-    }
-
-    /**
-     * Try to parse one schedule line into an event skeleton. Pure.
-     * @param {string} line
-     * @param {Date} ref
-     * @returns {Omit<CalEvent, "uid"> | null}
-     */
-    function parseLine(line, ref) {
-      const trimmed = line.trim();
-      if (!trimmed || /^[#*>\-\/]{3,}/.test(trimmed)) return null;
-
-      const loc = extractLocation(trimmed);
-      let work = loc.text;
-
-      // Date patterns
-      const datePatterns = [
-        /(?<year>\d{4})\s*[.\-\/년]\s*(?<month>\d{1,2})\s*[.\-\/월]\s*(?<day>\d{1,2})\s*일?/,
-        /(?<month>\d{1,2})\s*[.\-\/월]\s*(?<day>\d{1,2})\s*일?/,
-        /(?<month>\d{1,2})\s*\/\s*(?<day>\d{1,2})(?:\s*\/\s*(?<year>\d{2,4}))?/
-      ];
-
-      let dateParts = null;
-      for (let i = 0; i < datePatterns.length; i++) {
-        const m = work.match(datePatterns[i]);
-        if (m) {
-          dateParts = {
-            year: m.groups.year,
-            month: m.groups.month,
-            day: m.groups.day
-          };
-          work = (work.slice(0, m.index) + " " + work.slice(m.index + m[0].length)).trim();
-          break;
-        }
-      }
-
-      const weekdayMatch = work.match(/(이번\s*)?(월|화|수|목|금|토|일)요일/);
-      if (weekdayMatch && !dateParts) {
-        dateParts = { weekday: weekdayMatch[2], preferNext: !weekdayMatch[1] };
-        work = (work.slice(0, weekdayMatch.index) + " " + work.slice(weekdayMatch.index + weekdayMatch[0].length)).trim();
-      }
-
-      // Time range patterns
-      const timeRangePatterns = [
-        /(?<ampm1>오전|오후|AM|PM|am|pm)?\s*(?<t1>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?|\d{1,2})\s*(?<ampm1b>오전|오후|AM|PM|am|pm)?\s*(?:~|～|–|—|-|부터|~)\s*(?<ampm2>오전|오후|AM|PM|am|pm)?\s*(?<t2>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?|\d{1,2})\s*(?<ampm2b>오전|오후|AM|PM|am|pm)?/,
-        /(?<ampm1>오전|오후|AM|PM|am|pm)?\s*(?<t1>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?)\s*(?<ampm1b>오전|오후|AM|PM|am|pm)?/
-      ];
-
-      let startTime = null;
-      let endTime = null;
-      for (let i = 0; i < timeRangePatterns.length; i++) {
-        const m = work.match(timeRangePatterns[i]);
-        if (!m) continue;
-        const g = m.groups;
-        startTime = parseTimeToken(g.t1, g.ampm1 || g.ampm1b);
-        if (g.t2) endTime = parseTimeToken(g.t2, g.ampm2 || g.ampm2b || g.ampm1 || g.ampm1b);
-        work = (work.slice(0, m.index) + " " + work.slice(m.index + m[0].length)).trim();
-        break;
-      }
-
-      const date = resolveDate(dateParts || {}, ref);
-      if (!date && !startTime) {
-        // Title-only lines are ignored unless they look like dated bullets
-        return null;
-      }
-      if (!date) return null;
-
-      const title = work
-        .replace(/^[\s\-–—•·|/]+/, "")
-        .replace(/[\s\-–—|/]+$/, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-
-      if (!title) return null;
-
-      const allDay = !startTime;
-      let start;
-      let end;
-      if (allDay) {
-        start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-      } else {
-        start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startTime.h, startTime.m, 0, 0);
-        if (endTime) {
-          end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endTime.h, endTime.m, 0, 0);
-          if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-        } else {
-          end = new Date(start.getTime() + 60 * 60 * 1000);
-        }
-      }
-
-      return {
-        title: title,
-        start: start,
-        end: end,
-        location: loc.location || "",
-        description: trimmed,
-        allDay: allDay
-      };
-    }
-
-    /**
-     * Parse free-form schedule text into calendar events. Pure.
-     * @param {string} text
-     * @param {{ referenceDate?: Date }} [options]
-     * @returns {{ events: CalEvent[], warnings: string[] }}
-     */
-    function parseSchedule(text, options) {
-      const opts = options || {};
-      const ref = opts.referenceDate instanceof Date ? opts.referenceDate : new Date();
-      const warnings = [];
-      const events = [];
-      const raw = String(text || "").replace(/\r\n/g, "\n");
-      if (!raw.trim()) {
-        return { events: [], warnings: ["입력 텍스트가 비어 있습니다."] };
-      }
-
-      const lines = raw.split("\n");
-      lines.forEach(function (line, idx) {
-        const parsed = parseLine(line, ref);
-        if (!parsed) {
-          if (line.trim()) {
-            // soft warning only for lines that look schedule-like
-            if (/\d/.test(line) || /시|요일|월|일/.test(line)) {
-              warnings.push((idx + 1) + "행을 해석하지 못했습니다: " + line.trim());
-            }
-          }
-          return;
-        }
-        events.push({
-          uid: makeUid(parsed, events.length),
-          title: parsed.title,
-          start: parsed.start,
-          end: parsed.end,
-          location: parsed.location,
-          description: parsed.description,
-          allDay: parsed.allDay
-        });
-      });
-
-      if (!events.length) {
-        warnings.push("인식된 이벤트가 없습니다. 날짜와 제목이 같은 줄에 있는지 확인해 주세요.");
-      }
-      return { events: events, warnings: warnings };
-    }
-
-    /* Expose pure API for Phase 2 reuse / console debugging */
-    window.CalPass = {
-      parseSchedule: parseSchedule,
-      eventsToIcs: eventsToIcs,
-      escapeIcsText: escapeIcsText,
-      parseLine: parseLine,
-      parseTimeToken: parseTimeToken
-    };
-
-    /* ========================================================================
-     * UI (side effects only below this line)
-     * ======================================================================== */
-
-    const SAMPLES = [
-      {
-        label: "트레인톤",
-        text: "2026-09-09 14:00-16:00 트레인톤 킥오프 @강릉 창업허브\n2026-09-10 10:00-11:30 멘토링 세션 / 연세대 창업지원단\n9월 11일 오후 3시 데모데이 리허설 장소: 강릉 아트센터"
-      },
-      {
-        label: "요일+오전",
-        text: "수요일 오전 10시 팀 스탠드업 @Zoom\n금요일 14:00–15:00 투자자 미팅"
-      },
-      {
-        label: "한글 날짜",
-        text: "2026년 9월 12일 09:30-12:00 최종 발표\n9월 13일 해커톤 정리 (하루종일)"
-      }
+  /**
+   * @param {Array} events
+   * @param {{ now?: Date, calendarName?: string }} [options]
+   */
+  function eventsToIcs(events, options) {
+    options = options || {};
+    var now = options.now instanceof Date ? options.now : new Date();
+    var calendarName = options.calendarName || "톡일정";
+    var lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//TalkCal//KO",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:" + escapeIcsText(calendarName),
+      "X-WR-TIMEZONE:Asia/Seoul"
     ];
 
-    const input = document.getElementById("input");
-    const preview = document.getElementById("preview");
-    const statusEl = document.getElementById("status");
-    const charCount = document.getElementById("char-count");
-    const btnParse = document.getElementById("btn-parse");
-    const btnClear = document.getElementById("btn-clear");
-    const btnDownload = document.getElementById("btn-download");
-    const btnCopy = document.getElementById("btn-copy");
-    const btnSample = document.getElementById("btn-sample");
-    const sampleList = document.getElementById("sample-list");
-
-    /** @type {CalEvent[]} */
-    let currentEvents = [];
-
-    function formatWhen(ev) {
-      const optsDate = { year: "numeric", month: "short", day: "numeric", weekday: "short" };
-      const optsTime = { hour: "2-digit", minute: "2-digit" };
+    (events || []).forEach(function (ev, i) {
+      if (!ev || !(ev.start instanceof Date) || isNaN(ev.start.getTime())) return;
+      var end = ev.end instanceof Date && !isNaN(ev.end.getTime())
+        ? ev.end
+        : new Date(ev.start.getTime() + 60 * 60 * 1000);
+      lines.push("BEGIN:VEVENT");
+      lines.push("UID:" + (ev.uid || makeUid(ev, i)));
+      lines.push("DTSTAMP:" + formatIcsUtcStamp(now));
       if (ev.allDay) {
-        return ev.start.toLocaleDateString("ko-KR", optsDate) + " · 종일";
+        var dayEnd = startOfDay(end);
+        if (dayEnd.getTime() <= startOfDay(ev.start).getTime()) {
+          dayEnd = addDays(ev.start, 1);
+        }
+        lines.push("DTSTART;VALUE=DATE:" + formatIcsDate(ev.start));
+        lines.push("DTEND;VALUE=DATE:" + formatIcsDate(dayEnd));
+      } else {
+        lines.push("DTSTART;TZID=Asia/Seoul:" + formatIcsLocal(ev.start));
+        lines.push("DTEND;TZID=Asia/Seoul:" + formatIcsLocal(end));
       }
-      const sameDay = ev.start.toDateString() === ev.end.toDateString();
-      const start = ev.start.toLocaleString("ko-KR", Object.assign({}, optsDate, optsTime));
-      const end = sameDay
-        ? ev.end.toLocaleTimeString("ko-KR", optsTime)
-        : ev.end.toLocaleString("ko-KR", Object.assign({}, optsDate, optsTime));
-      return start + " – " + end;
+      lines.push("SUMMARY:" + escapeIcsText(ev.title || "일정"));
+      if (ev.location) lines.push("LOCATION:" + escapeIcsText(ev.location));
+      if (ev.description) lines.push("DESCRIPTION:" + escapeIcsText(ev.description));
+      lines.push("END:VEVENT");
+    });
+
+    lines.push("END:VCALENDAR");
+    return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+  }
+
+  /* ---------- KakaoTalk export → messages ---------- */
+
+  var DATE_SEP_RE = /^-*\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일(?:\s*([월화수목금토일])요일)?\s*-*$/;
+  var MSG_A_RE = /^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(오전|오후)\s*(\d{1,2}):(\d{2}),\s*(.+?)\s*:\s*(.*)$/;
+  var MSG_B_RE = /^\[([^\]]+)\]\s*\[(오전|오후)\s*(\d{1,2}):(\d{2})\]\s*(.*)$/;
+
+  function parseKakaoMessages(text) {
+    var lines = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    var messages = [];
+    var currentDate = null;
+    var current = null;
+
+    function pushCurrent() {
+      if (current) {
+        current.text = String(current.text || "").replace(/\s+$/, "");
+        if (current.text && !IGNORE_LINE_RE.test(current.text)) {
+          messages.push(current);
+        }
+      }
+      current = null;
     }
 
-    function setStatus(message, kind) {
-      statusEl.textContent = message || "";
-      statusEl.className = "status" + (kind ? " " + kind : "");
+    for (var i = 0; i < lines.length; i++) {
+      var raw = lines[i];
+      var line = raw.replace(/^\uFEFF/, "");
+      var trimmed = line.trim();
+
+      if (!trimmed) {
+        if (current) current.text += "\n";
+        continue;
+      }
+
+      if (IGNORE_LINE_RE.test(trimmed) && !MSG_A_RE.test(trimmed) && !MSG_B_RE.test(trimmed)) {
+        pushCurrent();
+        continue;
+      }
+
+      var sep = trimmed.match(DATE_SEP_RE);
+      if (sep) {
+        pushCurrent();
+        currentDate = new Date(Number(sep[1]), Number(sep[2]) - 1, Number(sep[3]));
+        continue;
+      }
+
+      var a = trimmed.match(MSG_A_RE);
+      if (a) {
+        pushCurrent();
+        var hourA = Number(a[5]);
+        if (a[4] === "오후" && hourA < 12) hourA += 12;
+        if (a[4] === "오전" && hourA === 12) hourA = 0;
+        currentDate = new Date(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+        current = {
+          speaker: a[7].trim(),
+          sentAt: new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hourA, Number(a[6]), 0, 0),
+          date: startOfDay(currentDate),
+          text: a[8] || ""
+        };
+        continue;
+      }
+
+      var b = trimmed.match(MSG_B_RE);
+      if (b) {
+        pushCurrent();
+        var hourB = Number(b[3]);
+        if (b[2] === "오후" && hourB < 12) hourB += 12;
+        if (b[2] === "오전" && hourB === 12) hourB = 0;
+        var base = currentDate ? startOfDay(currentDate) : startOfDay(new Date());
+        current = {
+          speaker: b[1].trim(),
+          sentAt: new Date(base.getFullYear(), base.getMonth(), base.getDate(), hourB, Number(b[4]), 0, 0),
+          date: base,
+          text: b[5] || ""
+        };
+        continue;
+      }
+
+      // Continuation / unknown line → append to previous message
+      if (current) {
+        current.text += (current.text ? "\n" : "") + line;
+      }
     }
 
-    function renderPreview(events) {
-      preview.innerHTML = "";
-      if (!events.length) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = "아직 파싱된 이벤트가 없습니다.";
-        preview.appendChild(empty);
-        btnDownload.disabled = true;
-        btnCopy.disabled = true;
+    pushCurrent();
+    return messages;
+  }
+
+  /* ---------- Schedule extraction from message text ---------- */
+
+  function parseClock(ampm, h, m, approx) {
+    var hour = Number(h);
+    var min = m == null || m === "" ? 0 : Number(m);
+    if (isNaN(hour) || isNaN(min)) return null;
+    var label = String(ampm || "");
+    if (/저녁|밤|오후/.test(label) && hour < 12) hour += 12;
+    if (/오전|아침/.test(label) && hour === 12) hour = 0;
+    if (/저녁/.test(label) && hour < 12) hour += 12;
+    if (hour > 23 || min > 59) return null;
+    return { h: hour, m: min, approx: !!approx };
+  }
+
+  function findTime(text) {
+    var patterns = [
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(\d{1,2})\s*분\s*(경)?/,
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*:\s*(\d{2})\s*(경)?/,
+      /(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(경)?/
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+      var m = text.match(patterns[i]);
+      if (!m) continue;
+      var clock;
+      if (i === 2) clock = parseClock(m[1], m[2], 0, m[3]);
+      else clock = parseClock(m[1], m[2], m[3], m[4]);
+      if (!clock) continue;
+      return { clock: clock, match: m[0], index: m.index };
+    }
+    // 20:00 style without am/pm already covered; bare 24h
+    var mil = text.match(/\b([01]?\d|2[0-3])\s*:\s*([0-5]\d)\b/);
+    if (mil) {
+      return {
+        clock: { h: Number(mil[1]), m: Number(mil[2]), approx: false },
+        match: mil[0],
+        index: mil.index
+      };
+    }
+    return null;
+  }
+
+  function mondayOfWeek(ref) {
+    var base = startOfDay(ref);
+    var cur = base.getDay(); // 0=Sun
+    return addDays(base, cur === 0 ? -6 : 1 - cur);
+  }
+
+  function dateOnWeek(monday, targetDow) {
+    if (targetDow === 0) return addDays(monday, 6); // Sunday
+    return addDays(monday, targetDow - 1);
+  }
+
+  function nextWeekday(ref, targetDow, weekOffset) {
+    // weekOffset 0 = this week (Mon–Sun), 1 = next week
+    var monday = mondayOfWeek(ref);
+    if (weekOffset === 1) monday = addDays(monday, 7);
+    return dateOnWeek(monday, targetDow);
+  }
+
+  function extractDate(text, refDate) {
+    var warnings = [];
+    var ref = startOfDay(refDate || new Date());
+    var work = text;
+    var result = null;
+
+    // 다음주 / 이번주 + weekday
+    var week = work.match(/(다음\s*주|이번\s*주)\s*([월화수목금토일])(?:요일)?/);
+    if (week) {
+      var dow = WEEKDAY_KO[week[2]];
+      var offset = /다음/.test(week[1]) ? 1 : 0;
+      result = {
+        date: nextWeekday(ref, dow, offset),
+        match: week[0],
+        index: week.index
+      };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, week.index, week[0].length) };
+    }
+
+    if (/(내일)/.test(work)) {
+      var t = work.match(/내일/);
+      result = { date: addDays(ref, 1), match: t[0], index: t.index };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, t.index, t[0].length) };
+    }
+    if (/(모레)/.test(work)) {
+      var mr = work.match(/모레/);
+      result = { date: addDays(ref, 2), match: mr[0], index: mr.index };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, mr.index, mr[0].length) };
+    }
+    if (/(오늘)/.test(work)) {
+      var td = work.match(/오늘/);
+      result = { date: ref, match: td[0], index: td.index };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, td.index, td[0].length) };
+    }
+
+    // 9/9(수) or 9월 9일(수) or 2026년 9월 9일
+    var abs = work.match(/(?:(\d{4})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일(?:\s*\(([월화수목금토일])\))?/);
+    if (!abs) abs = work.match(/(?:(\d{4})[.\-\/])?(\d{1,2})\s*[./\-]\s*(\d{1,2})(?:\s*\(([월화수목금토일])\))?/);
+
+    if (abs) {
+      var year = abs[1] ? Number(abs[1]) : ref.getFullYear();
+      var month = Number(abs[2]) - 1;
+      var day = Number(abs[3]);
+      var date = new Date(year, month, day);
+      if (date.getMonth() !== month || date.getDate() !== day) {
+        return { dateInfo: null, warnings: warnings, rest: work };
+      }
+      // If no year and date is > 6 months behind ref, bump year
+      if (!abs[1]) {
+        var tmp = new Date(year, month, day);
+        var diff = (tmp - ref) / (86400000);
+        if (diff < -180) date = new Date(year + 1, month, day);
+      }
+      if (abs[4]) {
+        var expected = WEEKDAY_KO[abs[4]];
+        if (expected != null && date.getDay() !== expected) {
+          warnings.push(
+            "날짜와 요일이 맞지 않습니다: " + abs[0] +
+            " → 실제 " + WEEKDAY_NAMES[date.getDay()] + "요일 (날짜 우선)"
+          );
+        }
+      }
+      result = { date: startOfDay(date), match: abs[0], index: abs.index };
+      return { dateInfo: result, warnings: warnings, rest: stripOnce(work, abs.index, abs[0].length) };
+    }
+
+    return { dateInfo: null, warnings: warnings, rest: work };
+  }
+
+  function stripOnce(text, index, len) {
+    return (text.slice(0, index) + " " + text.slice(index + len)).replace(/\s{2,}/g, " ").trim();
+  }
+
+  function extractLocation(text) {
+    var m = text.match(/([가-힣A-Za-z0-9]*?(?:역|홀|센터|카페|회의실|강의실|도서관|식당|공원|캠퍼스|빌딩|타워))\s*(\d+\s*층)?/);
+    if (m) {
+      return {
+        location: (m[1] + (m[2] ? " " + m[2] : "")).replace(/\s+/g, " ").trim(),
+        match: m[0]
+      };
+    }
+    m = text.match(/(\d+\s*층)/);
+    if (m) return { location: m[1].trim(), match: m[0] };
+    m = text.match(/([가-힣A-Za-z0-9]{2,20})\s*에서/);
+    if (m) return { location: m[1].trim(), match: m[0] };
+    return { location: "", match: "" };
+  }
+
+  function summarizeTitle(text) {
+    var t = String(text || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!t) return "일정";
+    if (t.length <= 40) return t;
+    return t.slice(0, 40).trim();
+  }
+
+  function messageHasScheduleCue(text) {
+    return /(?:\d{1,2}\s*[./월]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|내일|모레|오늘|다음\s*주|이번\s*주|\d{1,2}\s*시|\d{1,2}\s*:\s*\d{2}|오전|오후|저녁)/.test(text);
+  }
+
+  function extractEventFromMessage(msg) {
+    var text = String(msg.text || "").trim();
+    if (!text || !messageHasScheduleCue(text)) return null;
+
+    var dateRes = extractDate(text, msg.date || msg.sentAt || new Date());
+    var timeRes = findTime(dateRes.rest);
+    var work = dateRes.rest;
+    var timeMatch = "";
+    if (timeRes) {
+      timeMatch = timeRes.match;
+      work = stripOnce(work, timeRes.index, timeRes.match.length);
+    }
+
+    // Need at least a date OR a time (time alone → use message date)
+    if (!dateRes.dateInfo && !timeRes) return null;
+
+    var eventDate = dateRes.dateInfo ? dateRes.dateInfo.date : startOfDay(msg.date || msg.sentAt || new Date());
+    // If only time on message date, still an event
+    if (!dateRes.dateInfo && timeRes) {
+      // ok
+    } else if (!dateRes.dateInfo) {
+      return null;
+    }
+
+    var loc = extractLocation(work);
+    if (loc.match) work = work.replace(loc.match, " ");
+
+    // Strip leftover time/place connectors (avoid bare "에" — it breaks "에서")
+    work = work
+      .replace(/(오전|오후|아침|저녁|밤|에서|으로|까지|부터)/g, " ")
+      .replace(/(^|[\s])(경|로)(?=[\s]|$)/g, " ")
+      .replace(/[~\-–—:;]/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    // Title from first line remainder; full message stays in description
+    var title = summarizeTitle(work.split("\n")[0] || work);
+    var allDay = !timeRes;
+    var start;
+    var end;
+    if (allDay) {
+      start = startOfDay(eventDate);
+      end = addDays(eventDate, 1);
+    } else {
+      start = new Date(
+        eventDate.getFullYear(),
+        eventDate.getMonth(),
+        eventDate.getDate(),
+        timeRes.clock.h,
+        timeRes.clock.m,
+        0,
+        0
+      );
+      end = new Date(start.getTime() + 60 * 60 * 1000);
+    }
+
+    return {
+      title: title,
+      start: start,
+      end: end,
+      allDay: allDay,
+      location: loc.location || "",
+      description: (msg.speaker ? msg.speaker + ": " : "") + text,
+      sourceText: text,
+      speaker: msg.speaker || "",
+      warnings: dateRes.warnings || [],
+      selected: true
+    };
+  }
+
+  function parseScheduleFromKakao(text) {
+    var messages = parseKakaoMessages(text);
+    var events = [];
+    var warnings = [];
+    messages.forEach(function (msg) {
+      try {
+        var ev = extractEventFromMessage(msg);
+        if (ev) {
+          ev.uid = makeUid(ev, events.length);
+          events.push(ev);
+          if (ev.warnings && ev.warnings.length) {
+            warnings = warnings.concat(ev.warnings);
+          }
+        }
+      } catch (err) {
+        warnings.push("메시지 처리 중 오류: " + (err && err.message ? err.message : String(err)));
+      }
+    });
+    return { messages: messages, events: events, warnings: warnings };
+  }
+
+  /* expose for debugging / Phase 2 */
+  window.TalkCal = {
+    parseKakaoMessages: parseKakaoMessages,
+    parseScheduleFromKakao: parseScheduleFromKakao,
+    eventsToIcs: eventsToIcs,
+    extractEventFromMessage: extractEventFromMessage
+  };
+
+  /* ========================================================================
+   * UI
+   * ======================================================================== */
+
+  var chatInput = document.getElementById("chatInput");
+  var fileInput = document.getElementById("fileInput");
+  var btnFind = document.getElementById("btnFind");
+  var btnClear = document.getElementById("btnClear");
+  var btnExport = document.getElementById("btnExport");
+  var cardsEl = document.getElementById("cards");
+  var statusEl = document.getElementById("status");
+  var countLabel = document.getElementById("countLabel");
+
+  /** @type {Array} */
+  var stateEvents = [];
+
+  function setStatus(msg, kind) {
+    statusEl.textContent = msg || "";
+    statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function selectedEvents() {
+    return stateEvents.filter(function (e) { return e.selected; });
+  }
+
+  function updateExportEnabled() {
+    btnExport.disabled = selectedEvents().length === 0;
+    countLabel.textContent = stateEvents.length + "개 · 선택 " + selectedEvents().length;
+  }
+
+  function toDateInputValue(d, allDay) {
+    if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+    return (
+      d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+    );
+  }
+
+  function toTimeInputValue(d) {
+    if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+    return pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  }
+
+  function renderCards() {
+    cardsEl.innerHTML = "";
+    if (!stateEvents.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "아직 추출된 일정이 없습니다.";
+      cardsEl.appendChild(empty);
+      updateExportEnabled();
+      return;
+    }
+
+    stateEvents.forEach(function (ev, index) {
+      var card = document.createElement("article");
+      card.className = "card" + (ev.selected ? "" : " unchecked");
+
+      var top = document.createElement("div");
+      top.className = "card-top";
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!ev.selected;
+      cb.setAttribute("aria-label", "일정 선택");
+      cb.addEventListener("change", function () {
+        ev.selected = cb.checked;
+        card.classList.toggle("unchecked", !ev.selected);
+        updateExportEnabled();
+      });
+
+      var fields = document.createElement("div");
+      fields.className = "fields";
+
+      function field(labelText, inputEl) {
+        var wrap = document.createElement("div");
+        wrap.className = "field";
+        var lab = document.createElement("label");
+        lab.textContent = labelText;
+        wrap.appendChild(lab);
+        wrap.appendChild(inputEl);
+        return wrap;
+      }
+
+      var titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.value = ev.title || "";
+      titleInput.addEventListener("input", function () {
+        ev.title = titleInput.value;
+      });
+
+      var dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = toDateInputValue(ev.start, ev.allDay);
+      dateInput.addEventListener("change", function () {
+        var parts = dateInput.value.split("-");
+        if (parts.length !== 3) return;
+        var y = Number(parts[0]), mo = Number(parts[1]) - 1, da = Number(parts[2]);
+        if (ev.allDay) {
+          ev.start = new Date(y, mo, da);
+          ev.end = addDays(ev.start, 1);
+        } else {
+          ev.start = new Date(y, mo, da, ev.start.getHours(), ev.start.getMinutes(), 0, 0);
+          ev.end = new Date(ev.start.getTime() + 60 * 60 * 1000);
+        }
+      });
+
+      var timeInput = document.createElement("input");
+      timeInput.type = "time";
+      timeInput.value = ev.allDay ? "" : toTimeInputValue(ev.start);
+      timeInput.addEventListener("change", function () {
+        if (!timeInput.value) {
+          ev.allDay = true;
+          ev.start = startOfDay(ev.start);
+          ev.end = addDays(ev.start, 1);
+          return;
+        }
+        var hm = timeInput.value.split(":");
+        ev.allDay = false;
+        ev.start = new Date(
+          ev.start.getFullYear(),
+          ev.start.getMonth(),
+          ev.start.getDate(),
+          Number(hm[0]),
+          Number(hm[1]),
+          0,
+          0
+        );
+        ev.end = new Date(ev.start.getTime() + 60 * 60 * 1000);
+      });
+
+      var locInput = document.createElement("input");
+      locInput.type = "text";
+      locInput.value = ev.location || "";
+      locInput.placeholder = "장소 (선택)";
+      locInput.addEventListener("input", function () {
+        ev.location = locInput.value;
+      });
+
+      fields.appendChild(field("제목", titleInput));
+      var g = document.createElement("div");
+      g.className = "grid-2";
+      g.appendChild(field("날짜", dateInput));
+      g.appendChild(field("시간", timeInput));
+      fields.appendChild(g);
+      fields.appendChild(field("장소", locInput));
+
+      if (ev.warnings && ev.warnings.length) {
+        ev.warnings.forEach(function (w) {
+          var badge = document.createElement("div");
+          badge.className = "warn-badge";
+          badge.textContent = w;
+          fields.appendChild(badge);
+        });
+      }
+
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = "<strong>원본</strong> ";
+      meta.appendChild(document.createTextNode(ev.sourceText || ev.description || ""));
+
+      top.appendChild(cb);
+      top.appendChild(fields);
+      card.appendChild(top);
+      card.appendChild(meta);
+      cardsEl.appendChild(card);
+    });
+
+    updateExportEnabled();
+  }
+
+  function findSchedules() {
+    try {
+      var raw = chatInput.value;
+      if (!String(raw || "").trim()) {
+        stateEvents = [];
+        renderCards();
+        setStatus("대화 텍스트를 붙여넣거나 .txt를 업로드해 주세요.", "warn");
         return;
       }
-      events.forEach(function (ev, i) {
-        const article = document.createElement("article");
-        article.className = "event";
-        article.style.animationDelay = (i * 0.05) + "s";
-        const h3 = document.createElement("h3");
-        h3.textContent = ev.title;
-        const dl = document.createElement("dl");
-        const when = document.createElement("dd");
-        when.className = "when";
-        when.textContent = formatWhen(ev);
-        dl.appendChild(when);
-        if (ev.location) {
-          const where = document.createElement("dd");
-          where.className = "where";
-          where.textContent = ev.location;
-          dl.appendChild(where);
-        }
-        article.appendChild(h3);
-        article.appendChild(dl);
-        preview.appendChild(article);
-      });
-      btnDownload.disabled = false;
-      btnCopy.disabled = false;
-    }
-
-    function runParse() {
-      const result = parseSchedule(input.value, { referenceDate: new Date() });
-      currentEvents = result.events;
-      renderPreview(currentEvents);
-      if (currentEvents.length && result.warnings.length) {
-        setStatus(currentEvents.length + "개 이벤트 · " + result.warnings[0], "warn");
-      } else if (currentEvents.length) {
-        setStatus(currentEvents.length + "개 이벤트를 인식했습니다.", "ok");
+      var result = parseScheduleFromKakao(raw);
+      stateEvents = result.events;
+      renderCards();
+      if (!result.events.length) {
+        setStatus(
+          "메시지를 " + result.messages.length + "개 읽었지만 일정을 찾지 못했습니다.",
+          "warn"
+        );
       } else {
-        setStatus(result.warnings[0] || "이벤트를 찾지 못했습니다.", "err");
+        var warnExtra = result.warnings.length ? " · 경고 " + result.warnings.length + "건" : "";
+        setStatus(
+          "메시지 " + result.messages.length + "개 중 일정 " + result.events.length + "개 추출" + warnExtra,
+          result.warnings.length ? "warn" : "ok"
+        );
       }
+    } catch (err) {
+      stateEvents = [];
+      renderCards();
+      setStatus("파싱 중 오류가 발생했습니다: " + (err && err.message ? err.message : err), "err");
     }
+  }
 
-    function downloadIcs() {
-      if (!currentEvents.length) return;
-      const ics = eventsToIcs(currentEvents, { calendarName: "CalPass" });
-      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
+  function exportIcs() {
+    try {
+      var picked = selectedEvents();
+      if (!picked.length) return;
+      var ics = eventsToIcs(picked, { calendarName: "톡일정" });
+      var blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
       a.href = url;
-      a.download = "calpass-" + toIcsDateLocal(new Date()) + ".ics";
+      a.download = "talkcal-" + formatIcsDate(new Date()) + ".ics";
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      setStatus("ICS 파일을 저장했습니다.", "ok");
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      setStatus(picked.length + "개 일정을 .ics로 저장했습니다.", "ok");
+    } catch (err) {
+      setStatus("내보내기 실패: " + (err && err.message ? err.message : err), "err");
     }
+  }
 
-    async function copyIcs() {
-      if (!currentEvents.length) return;
-      const ics = eventsToIcs(currentEvents, { calendarName: "CalPass" });
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
       try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(ics);
-        } else {
-          const ta = document.createElement("textarea");
-          ta.value = ics;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand("copy");
-          ta.remove();
-        }
-        setStatus("ICS 내용을 클립보드에 복사했습니다.", "ok");
+        chatInput.value = String(reader.result || "");
+        setStatus(file.name + " 불러옴 · " + chatInput.value.length + "자", "ok");
+        findSchedules();
       } catch (err) {
-        setStatus("복사에 실패했습니다. 다운로드를 사용해 주세요.", "err");
+        setStatus("파일 읽기 실패: " + (err && err.message ? err.message : err), "err");
       }
-    }
+    };
+    reader.onerror = function () {
+      setStatus("파일을 읽을 수 없습니다.", "err");
+    };
+    reader.readAsText(file, "UTF-8");
+    fileInput.value = "";
+  });
 
-    function updateCount() {
-      charCount.textContent = input.value.length + "자";
-    }
+  btnFind.addEventListener("click", findSchedules);
+  btnExport.addEventListener("click", exportIcs);
+  btnClear.addEventListener("click", function () {
+    chatInput.value = "";
+    stateEvents = [];
+    renderCards();
+    setStatus("");
+    chatInput.focus();
+  });
 
-    function fillSample(sample) {
-      input.value = sample.text;
-      updateCount();
-      runParse();
-      input.focus();
-    }
-
-    SAMPLES.forEach(function (sample) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "chip";
-      btn.textContent = sample.label;
-      btn.addEventListener("click", function () { fillSample(sample); });
-      sampleList.appendChild(btn);
-    });
-
-    btnParse.addEventListener("click", runParse);
-    btnClear.addEventListener("click", function () {
-      input.value = "";
-      currentEvents = [];
-      updateCount();
-      renderPreview([]);
-      setStatus("");
-      input.focus();
-    });
-    btnDownload.addEventListener("click", downloadIcs);
-    btnCopy.addEventListener("click", copyIcs);
-    btnSample.addEventListener("click", function () { fillSample(SAMPLES[0]); });
-    input.addEventListener("input", updateCount);
-    input.addEventListener("keydown", function (e) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        runParse();
-      }
-    });
-
-    updateCount();
-
-    // Lightweight self-checks (no network, console only)
-    (function selfCheck() {
-      const sample = SAMPLES[0].text;
-      const parsed = parseSchedule(sample, { referenceDate: new Date("2026-09-09T00:00:00") });
-      const ics = eventsToIcs(parsed.events, { now: new Date("2026-09-09T00:00:00Z") });
-      const ok = parsed.events.length >= 3 && /BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics);
-      if (!ok) console.warn("[CalPass] self-check failed", parsed, ics.slice(0, 200));
-      else console.info("[CalPass] self-check ok:", parsed.events.length, "events");
-    })();
+  /* self-check (console) */
+  try {
+    var sample =
+      "--------------- 2026년 9월 9일 수요일 ---------------\n" +
+      "2026. 9. 9. 오전 8:13, 홍길동 : 내일 오후 3시 강릉역에서 만나자\n" +
+      "추가 안내: 2번 출구\n" +
+      "[김연세] [오후 2:05] 9/12(토) 저녁 7시 회의실 3층\n" +
+      "홍길동님이 들어왔습니다.\n" +
+      "사진\n" +
+      "2026. 9. 9. 오후 4:00, 이수 : 9/9(수) 오전 10시 미팅";
+    var check = parseScheduleFromKakao(sample);
+    var ics = eventsToIcs(check.events);
+    console.info(
+      "[톡일정] self-check:",
+      check.messages.length,
+      "msgs,",
+      check.events.length,
+      "events,",
+      (ics.match(/BEGIN:VEVENT/g) || []).length,
+      "vevents"
+    );
+  } catch (e) {
+    console.warn("[톡일정] self-check failed", e);
+  }
+})();
   </script>
 </body>
 </html>
