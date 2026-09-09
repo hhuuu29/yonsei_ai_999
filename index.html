@@ -344,66 +344,414 @@
       border: 0;
     }
   </style>
+  <style id="phase2-ui">
+    :root {
+      --bg: #F1F3EF;
+      --paper: #FFFFFF;
+      --ink: #0E1B1A;
+      --ink-2: #4B5F5D;
+      --hair: rgba(14, 27, 26, .10);
+      --bot: #0E1B1A;
+      --bot-ink: #F1F3EF;
+      --teal: #0F7A6C;
+      --teal-soft: rgba(15, 122, 108, .10);
+      --coral: #B84A1A;
+      --coral-soft: rgba(184, 74, 26, .10);
+      --chat-q: #E6EBE6;
+      --font: "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+    .num { font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+    .shell {
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+    }
+    .top {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid var(--hair);
+      background: var(--bg);
+      z-index: 20;
+    }
+    .wm { font-size: 22px; font-weight: 800; letter-spacing: -.05em; }
+    .wm small {
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--ink-2);
+      letter-spacing: 0;
+    }
+    .top-actions { display: flex; align-items: center; gap: 7px; }
+    .pill, .ai-badge {
+      border: 1px solid var(--hair);
+      background: var(--paper);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .pill b, .ai-badge.on { color: var(--teal); }
+    .ai-badge::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      margin-right: 6px;
+      border-radius: 50%;
+      background: var(--hair);
+      vertical-align: 1px;
+    }
+    .ai-badge.on::before { background: var(--teal); }
+    .api-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 16px;
+      width: min(360px, calc(100vw - 32px));
+      padding: 12px;
+      border: 1px solid var(--hair);
+      border-radius: 14px;
+      background: var(--paper);
+      box-shadow: 0 16px 40px rgba(14, 27, 26, .14);
+    }
+    .api-panel[hidden] { display: none; }
+    .api-panel label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
+    .api-panel input {
+      width: 100%;
+      border: 1px solid var(--hair);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--ink);
+      padding: 10px 11px;
+    }
+    .app-status {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 16px;
+      z-index: 40;
+      max-width: calc(100vw - 32px);
+      min-height: 18px;
+      margin: 0;
+      padding: 6px 10px;
+      border: 1px solid var(--hair);
+      border-radius: 999px;
+      background: var(--paper);
+      color: var(--ink-2);
+      box-shadow: 0 8px 24px rgba(14, 27, 26, .10);
+      font-size: 12px;
+    }
+    .app-status:empty { display: none; }
+    .app-status.warn { color: var(--coral); }
+    .app-status.ok { color: var(--teal); }
+    .chat {
+      overflow-y: auto;
+      padding: 18px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+    .msg { max-width: 88%; font-size: 15px; line-height: 1.55; }
+    .msg.bot {
+      align-self: flex-start;
+      background: var(--bot);
+      color: var(--bot-ink);
+      padding: 12px 15px;
+      border-radius: 4px 18px 18px 18px;
+    }
+    .msg.me {
+      align-self: flex-end;
+      background: var(--paper);
+      border: 1px solid var(--hair);
+      padding: 12px 15px;
+      border-radius: 18px 4px 18px 18px;
+    }
+    .msg.wide { max-width: 100%; align-self: stretch; background: transparent; padding: 0; }
+    .stamp { align-self: flex-end; margin-top: -10px; font-size: 11.5px; color: var(--ink-2); }
+    .file { display: flex; gap: 12px; align-items: center; }
+    .file .ico {
+      position: relative;
+      width: 38px;
+      height: 44px;
+      flex: none;
+      border-radius: 5px;
+      background: var(--chat-q);
+    }
+    .file .ico::after {
+      content: "txt";
+      position: absolute;
+      right: 0;
+      bottom: 5px;
+      left: 0;
+      color: var(--ink-2);
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .file b { display: block; font-size: 14px; word-break: break-all; }
+    .file span { display: block; color: var(--ink-2); font-size: 12.5px; }
+    .event-stack { display: grid; gap: 8px; }
+    .ev {
+      display: grid;
+      grid-template-columns: 54px 1fr auto;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 14px 12px 10px;
+      border: 1px solid var(--hair);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+    .ev .d { text-align: center; line-height: 1; }
+    .ev .d .n { display: block; font-size: 34px; font-weight: 800; }
+    .ev .d .w { display: block; margin-top: 3px; color: var(--ink-2); font-size: 12px; }
+    .ev h4 { margin: 0; font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; }
+    .ev .sub { margin-top: 2px; color: var(--ink-2); font-size: 13px; }
+    .ev .sub .t { color: var(--ink); font-weight: 600; }
+    .ev .conf { display: flex; gap: 3px; padding-top: 6px; }
+    .ev .conf i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); }
+    .ev .conf i.o { background: var(--hair); }
+    .ev.flag { border-color: var(--coral); }
+    .ev.flag .d .n { color: var(--coral); }
+    .ev .note {
+      grid-column: 2 / -1;
+      margin-top: 6px;
+      padding: 6px 9px;
+      border-radius: 7px;
+      background: var(--coral-soft);
+      color: var(--coral);
+      font-size: 12.5px;
+    }
+    .ev.dim { opacity: .5; }
+    .list { margin: 10px 0 0; padding: 0; list-style: none; }
+    .list li {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 8px 0;
+      border-top: 1px solid rgba(241, 243, 239, .14);
+      font-size: 14.5px;
+    }
+    .list li .chg { display: block; margin-top: 2px; color: #F0B429; font-size: 12px; }
+    .src {
+      flex: none;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(241, 243, 239, .12);
+      color: var(--bot-ink);
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .q {
+      display: none;
+      grid-column: 1 / -1;
+      width: 100%;
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 4px 14px 14px 14px;
+      background: var(--chat-q);
+      color: var(--ink);
+      font-size: 13.5px;
+    }
+    .q.on { display: block; }
+    .q .who { margin-bottom: 3px; color: var(--ink-2); font-size: 12px; }
+    .q .who b { color: var(--ink); }
+    .q mark { border-radius: 3px; background: var(--teal-soft); color: inherit; padding: 0 2px; }
+    .compose {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--hair);
+      background: var(--bg);
+    }
+    .compose .att, .compose .send {
+      width: 44px;
+      height: 44px;
+      flex: none;
+      border-radius: 12px;
+      font-weight: 700;
+    }
+    .compose .att { position: relative; overflow: hidden; border: 1px solid var(--hair); background: var(--paper); font-size: 13px; }
+    .compose .att input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .compose .in {
+      min-height: 44px;
+      max-height: 100px;
+      flex: 1;
+      resize: none;
+      border: 1px solid var(--hair);
+      border-radius: 14px;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 11px 14px;
+      font-size: 15px;
+    }
+    .compose .in::placeholder { color: var(--ink-2); }
+    .compose .send { border: 0; background: var(--ink); color: var(--bg); }
+    .compose .send:disabled { cursor: not-allowed; opacity: .35; }
+    .board {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: none;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .board.open { display: flex; }
+    .board .bh { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 18px 10px; }
+    .board .bh h2 { margin: 0; font-size: 16px; font-weight: 700; }
+    .board .bh h2 small { margin-left: 8px; color: var(--ink-2); font-size: 13px; font-weight: 500; }
+    .board .close { border: 0; background: transparent; color: var(--ink-2); font-size: 14px; }
+    .board .bl { position: relative; flex: 1; overflow-y: auto; padding: 0 16px 16px 34px; }
+    .board .bl::before {
+      content: "";
+      position: absolute;
+      top: 8px;
+      bottom: 16px;
+      left: 22px;
+      width: 2px;
+      background: var(--hair);
+    }
+    .board .ev { position: relative; grid-template-columns: 24px 54px 1fr auto; padding-left: 12px; }
+    .board .ev::before {
+      content: "";
+      position: absolute;
+      top: 22px;
+      left: -17px;
+      width: 10px;
+      height: 10px;
+      border: 2px solid var(--bg);
+      border-radius: 50%;
+      background: var(--teal);
+    }
+    .board .ev.flag::before { background: var(--coral); }
+    .board .ev.dim::before { background: var(--hair); }
+    .board .ev input { width: 18px; height: 18px; margin-top: 10px; accent-color: var(--teal); }
+    .sec {
+      position: relative;
+      margin: 14px 2px 8px -34px;
+      padding-left: 34px;
+      background: var(--bg);
+      color: var(--ink-2);
+      font-size: 12.5px;
+    }
+    .board .todo { position: relative; padding: 6px 0 6px 2px; color: var(--ink-2); font-size: 14px; }
+    .board .todo::before {
+      content: "";
+      position: absolute;
+      top: 13px;
+      left: -16px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--hair);
+    }
+    .board-empty { padding: 32px 12px; color: var(--ink-2); text-align: center; font-size: 14px; }
+    .board .ba {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--hair);
+    }
+    .board .ba button {
+      flex: 1;
+      border: 1px solid var(--hair);
+      border-radius: 12px;
+      background: var(--paper);
+      padding: 14px;
+      font-weight: 700;
+    }
+    .board .ba button.go { border-color: var(--teal); background: var(--teal); color: #fff; }
+    .board .ba button:disabled { cursor: not-allowed; opacity: .38; }
+    @media (min-width: 900px) {
+      .shell {
+        grid-template-columns: minmax(380px, 460px) 1fr;
+        grid-template-rows: auto 1fr auto;
+        max-width: 1240px;
+        margin: 0 auto;
+      }
+      .top { grid-column: 1 / -1; }
+      .pill { display: none; }
+      .board {
+        position: static;
+        display: flex !important;
+        grid-row: 2 / 4;
+        grid-column: 2;
+        border-left: 1px solid var(--hair);
+      }
+      .board .close { display: none; }
+    }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>두투두</h1>
-      <p>카카오톡 대화에서 일정과 챙길 것을 정리합니다.</p>
+  <div class="shell">
+    <header class="top">
+      <div class="wm">두투두<small>단톡방을 캘린더로</small></div>
+      <div class="top-actions">
+        <button type="button" class="ai-badge" id="aiBadge" aria-expanded="false">AI 정제</button>
+        <button type="button" class="pill" id="openBoard" aria-controls="board" aria-expanded="false">일정 <b id="mobileEventCount">0</b></button>
+      </div>
+      <div class="api-panel" id="apiPanel" hidden>
+        <label for="apiKeyInput">Gemini API 키 · 이 탭의 sessionStorage에만 저장</label>
+        <input id="apiKeyInput" type="password" autocomplete="off" placeholder="API 키 입력" />
+      </div>
+      <div class="app-status" id="status" role="status" aria-live="polite"></div>
     </header>
 
-    <section class="panel" aria-label="대화 입력">
-      <label class="sr-only" for="chatInput">카카오톡 대화 텍스트</label>
+    <main class="chat" id="chat" aria-live="polite"></main>
+
+    <form class="compose" id="composer">
+      <label class="att">
+        파일
+        <input id="fileInput" type="file" accept=".txt,text/plain" aria-label="카카오톡 대화 파일 첨부" />
+      </label>
       <textarea
-        id="chatInput"
-        spellcheck="false"
-        placeholder="카카오톡 ‘대화 내용 내보내기’ .txt를 붙여넣거나 업로드하세요.
-
-예)
---------------- 2026년 9월 9일 수요일 ---------------
-2026. 9. 9. 오전 8:13, 홍길동 : 내일 오후 3시 강릉역에서 만나자
-[김연세] [오후 2:05] 9/12(토) 저녁 7시 회의실 3층"
+        class="in"
+        id="composerInput"
+        rows="1"
+        aria-label="두투두에게 메시지 입력"
+        placeholder="대화 export를 붙여넣거나, 두투두에게 묻기"
       ></textarea>
-      <div class="row">
-        <label class="btn btn-secondary btn-file">
-          .txt 업로드
-          <input id="fileInput" type="file" accept=".txt,text/plain" />
-        </label>
-        <button type="button" class="btn btn-secondary" id="btnClear">비우기</button>
-        <label class="api-key-wrap">
-          <span class="sr-only">Gemini API 키</span>
-          <input id="apiKeyInput" type="password" autocomplete="off" placeholder="Gemini API 키 (세션에만 저장)" />
-          <span id="llmStatus" class="ai-state">AI 비활성</span>
-        </label>
-        <button type="button" class="btn btn-primary" id="btnFind">일정 찾기</button>
-      </div>
-    </section>
-    <p class="status" id="status" role="status" aria-live="polite"></p>
+      <button type="submit" class="send" id="sendButton" aria-label="전송" disabled>↑</button>
+    </form>
 
-    <div class="section-title">
-      <h2>추출된 일정</h2>
-      <span id="countLabel">0개</span>
-    </div>
-    <div id="tooManyWarn" class="warn-banner" role="status"></div>
-    <div id="cards" class="cards" aria-live="polite">
-      <div class="empty">아직 추출된 일정이 없습니다.</div>
-    </div>
-
-    <section id="todosSection" hidden>
-      <div class="section-title">
-        <h2>할 일</h2>
-        <span id="todoCountLabel">0개</span>
+    <aside class="board" id="board" role="dialog" aria-modal="false" aria-labelledby="boardTitle">
+      <div class="bh">
+        <h2 id="boardTitle">캘린더에 넣을 일정<small id="selectedCount">0개 선택</small></h2>
+        <button type="button" class="close" id="closeBoard">닫기</button>
       </div>
-      <div class="card">
-        <ul id="todoList" class="todo-list"></ul>
+      <div class="bl" id="boardList"></div>
+      <div class="ba">
+        <button type="button" id="btnExport" disabled>.ics 저장</button>
+        <button type="button" class="go" disabled title="4단계에서 연결">구글 캘린더에 추가</button>
       </div>
-    </section>
-
-    <div class="export-bar">
-      <button type="button" class="btn btn-primary" id="btnExport" disabled>
-        선택한 일정 .ics로 내보내기
-      </button>
-    </div>
+    </aside>
   </div>
 
   <script src="llm-extractor.js"></script>
@@ -1024,6 +1372,9 @@
     cutMatchedSpans: cutMatchedSpans
   };
 
+  // Phase 2 UI lives in ui.js and consumes the pure API above.
+  return;
+
   /* ========================================================================
    * UI
    * ======================================================================== */
@@ -1414,5 +1765,6 @@
 
 })();
   </script>
+  <script src="ui.js"></script>
 </body>
 </html>
