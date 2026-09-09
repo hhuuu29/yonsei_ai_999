@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yonsei AI 999</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #1e293b;
+        --accent: #6366f1;
+        --accent-2: #22d3ee;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: radial-gradient(1200px 600px at 20% -10%, #1e293b, var(--bg));
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .app {
+        width: 100%;
+        max-width: 640px;
+        background: var(--panel);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+      }
+      header {
+        padding: 20px 24px;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #0b1120;
+      }
+      header h1 { margin: 0; font-size: 1.35rem; letter-spacing: 0.3px; }
+      header p { margin: 4px 0 0; font-size: 0.85rem; opacity: 0.8; }
+      #log {
+        height: 420px;
+        overflow-y: auto;
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .msg { max-width: 80%; padding: 10px 14px; border-radius: 14px; line-height: 1.4; white-space: pre-wrap; }
+      .user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px; }
+      .bot { align-self: flex-start; background: #0b1120; border: 1px solid rgba(148, 163, 184, 0.2); border-bottom-left-radius: 4px; }
+      .intent { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+      form { display: flex; gap: 10px; padding: 16px 24px; border-top: 1px solid rgba(148, 163, 184, 0.15); }
+      input {
+        flex: 1;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: #0b1120;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      input:focus { outline: 2px solid var(--accent); }
+      button {
+        padding: 12px 20px;
+        border: none;
+        border-radius: 12px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { filter: brightness(1.1); }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>Yonsei AI 999</h1>
+        <p>A tiny offline assistant — try "reverse hello", "count words in a b c", or "2 * (3 + 4)"</p>
+      </header>
+      <div id="log">
+        <div class="msg bot">Hi! I'm Yonsei AI 999. Ask me something to get started.<span class="intent">intent: greeting</span></div>
+      </div>
+      <form id="form">
+        <input id="input" autocomplete="off" placeholder="Type a message…" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+
+    <script>
+      const log = document.getElementById("log");
+      const form = document.getElementById("form");
+      const input = document.getElementById("input");
+
+      function add(text, cls, intent) {
+        const el = document.createElement("div");
+        el.className = `msg ${cls}`;
+        el.textContent = text;
+        if (intent) {
+          const tag = document.createElement("span");
+          tag.className = "intent";
+          tag.textContent = `intent: ${intent}`;
+          el.appendChild(tag);
+        }
+        log.appendChild(el);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const message = input.value.trim();
+        if (!message) return;
+        add(message, "user");
+        input.value = "";
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            add(`Error: ${data.error}`, "bot");
+          } else {
+            add(data.reply, "bot", data.intent);
+          }
+        } catch (err) {
+          add(`Network error: ${err}`, "bot");
+        }
+      });
+    </script>
+  </body>
+</html>

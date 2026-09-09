@@ -1,0 +1,16 @@
+{
+  "name": "yonsei_ai_999",
+  "install": "sudo apt-get update && sudo apt-get install -y python3.12-venv && python3 -m venv .venv && . .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt",
+  "terminals": [
+    {
+      "name": "web",
+      "command": ". .venv/bin/activate && python app.py"
+    }
+  ],
+  "ports": [
+    {
+      "name": "web",
+      "port": 8000
+    }
+  ]
+}
