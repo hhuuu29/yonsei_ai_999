@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#0b1f2a" />
+  <title>CalPass — 텍스트를 일정으로</title>
+  <style>
+    :root {
+      --ink: #0b1f2a;
+      --ink-soft: #1a3544;
+      --mist: #d7e6ef;
+      --fog: #eef5f8;
+      --paper: #f7fbfc;
+      --line: rgba(11, 31, 42, 0.12);
+      --signal: #e85d04;
+      --signal-deep: #c44d00;
+      --sea: #2a6f7f;
+      --sea-bright: #3d8fa3;
+      --ok: #1f7a4c;
+      --warn: #9a6700;
+      --shadow: 0 18px 50px rgba(11, 31, 42, 0.14);
+      --radius: 18px;
+      --font-display: "Avenir Next", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      --font-body: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Segoe UI", sans-serif;
+      --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      color: var(--ink);
+      font-family: var(--font-body);
+      line-height: 1.5;
+      background:
+        radial-gradient(1200px 700px at 12% -10%, rgba(61, 143, 163, 0.28), transparent 55%),
+        radial-gradient(900px 600px at 100% 8%, rgba(232, 93, 4, 0.16), transparent 50%),
+        linear-gradient(165deg, #c9dde8 0%, var(--fog) 38%, var(--paper) 100%);
+      background-attachment: fixed;
+    }
+
+    .rail {
+      position: fixed;
+      inset: 0 auto 0 0;
+      width: 6px;
+      background: linear-gradient(180deg, var(--sea-bright), var(--ink) 45%, var(--signal));
+      opacity: 0.85;
+      pointer-events: none;
+    }
+
+    .wrap {
+      width: min(920px, calc(100% - 2rem));
+      margin: 0 auto;
+      padding: 1.25rem 0 4rem;
+    }
+
+    .hero {
+      min-height: min(72dvh, 640px);
+      display: grid;
+      align-content: end;
+      gap: 1.1rem;
+      padding: 2.5rem 0 2rem;
+      animation: rise 0.8s ease-out both;
+    }
+
+    .brand {
+      margin: 0;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(3.2rem, 14vw, 5.6rem);
+      letter-spacing: -0.06em;
+      line-height: 0.92;
+      color: var(--ink);
+    }
+
+    .brand span {
+      display: inline-block;
+      color: var(--sea);
+      animation: slideIn 0.9s 0.15s ease-out both;
+    }
+
+    .tagline {
+      margin: 0;
+      max-width: 22rem;
+      font-size: 1.05rem;
+      color: var(--ink-soft);
+      opacity: 0.9;
+      animation: rise 0.8s 0.2s ease-out both;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      animation: rise 0.8s 0.35s ease-out both;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 0.85rem 1.25rem;
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .btn:active { transform: translateY(1px) scale(0.98); }
+    .btn-primary {
+      background: var(--signal);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(232, 93, 4, 0.28);
+    }
+    .btn-primary:hover { background: var(--signal-deep); }
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    section {
+      margin-top: 1.75rem;
+      animation: rise 0.7s ease-out both;
+    }
+
+    .section-head h2 {
+      margin: 0 0 0.35rem;
+      font-family: var(--font-display);
+      font-size: 1.55rem;
+      letter-spacing: -0.03em;
+    }
+    .section-head p {
+      margin: 0 0 1rem;
+      color: var(--ink-soft);
+      opacity: 0.85;
+      font-size: 0.95rem;
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      backdrop-filter: blur(12px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 220px;
+      padding: 1.1rem 1.15rem;
+      border: 0;
+      resize: vertical;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 1rem;
+      line-height: 1.55;
+      outline: none;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      padding: 0.85rem 1rem 1rem;
+      border-top: 1px solid var(--line);
+      background: rgba(247, 251, 252, 0.8);
+    }
+
+    .meta {
+      margin-left: auto;
+      align-self: center;
+      font-size: 0.82rem;
+      color: var(--sea);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .events {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .event {
+      padding: 1rem 1.1rem;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      animation: rise 0.45s ease-out both;
+    }
+    .event h3 {
+      margin: 0 0 0.45rem;
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+    .event dl {
+      margin: 0;
+      display: grid;
+      gap: 0.25rem;
+      font-size: 0.9rem;
+      color: var(--ink-soft);
+    }
+    .event dt {
+      display: none;
+    }
+    .event dd {
+      margin: 0;
+    }
+    .event .when::before { content: "⏱ "; }
+    .event .where::before { content: "📍 "; }
+    .empty {
+      padding: 1.4rem 1.1rem;
+      color: var(--ink-soft);
+      opacity: 0.8;
+      font-size: 0.95rem;
+    }
+
+    .status {
+      min-height: 1.25rem;
+      margin: 0.65rem 0 0;
+      font-size: 0.88rem;
+    }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    .status.err { color: #b42318; }
+
+    details.samples {
+      margin-top: 0.85rem;
+    }
+    details.samples summary {
+      cursor: pointer;
+      color: var(--sea);
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+    .sample-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.65);
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.82rem;
+      color: var(--ink-soft);
+      opacity: 0.85;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(11, 31, 42, 0.06);
+      padding: 0.1em 0.35em;
+      border-radius: 6px;
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @media (min-width: 720px) {
+      .hero { min-height: min(68dvh, 560px); padding-top: 4rem; }
+      .brand { font-size: 5.4rem; }
+      .layout {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 1.25rem;
+        align-items: start;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="rail" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="hero">
+      <h1 class="brand">Cal<span>Pass</span></h1>
+      <p class="tagline">붙여넣은 일정을 오프라인에서 바로 <code>.ics</code>로. 네트워크 없이, 파일 하나로.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#composer">일정 붙여넣기</a>
+        <button type="button" class="btn btn-ghost" id="btn-sample">샘플 채우기</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section id="composer" aria-labelledby="compose-title">
+        <div class="section-head">
+          <h2 id="compose-title">일정 텍스트</h2>
+          <p>날짜·시간·제목·장소가 섞인 메모를 넣으면 규칙 기반 파서가 이벤트로 나눕니다.</p>
+        </div>
+        <div class="panel">
+          <label class="visually-hidden" for="input" style="position:absolute;left:-9999px">일정 원문</label>
+          <textarea id="input" spellcheck="false" placeholder="예)
+2026-09-09 14:00–16:00 트레인톤 킥오프 @강릉
+9월 10일 오전 10시 멘토링 / 연세대 창업지원단
+…"></textarea>
+          <div class="toolbar">
+            <button type="button" class="btn btn-primary" id="btn-parse">파싱하기</button>
+            <button type="button" class="btn btn-ghost" id="btn-clear">비우기</button>
+            <span class="meta" id="char-count">0자</span>
+          </div>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+        <details class="samples">
+          <summary>다른 샘플 형식</summary>
+          <div class="sample-list" id="sample-list"></div>
+        </details>
+      </section>
+
+      <section aria-labelledby="preview-title">
+        <div class="section-head">
+          <h2 id="preview-title">이벤트 미리보기</h2>
+          <p>확인 후 캘린더 파일로 저장하세요. Phase 2에서 같은 파서를 Google Calendar에 재사용합니다.</p>
+        </div>
+        <div id="preview" class="events" aria-live="polite">
+          <div class="empty">아직 파싱된 이벤트가 없습니다.</div>
+        </div>
+        <div class="cta-row" style="margin-top:1rem">
+          <button type="button" class="btn btn-primary" id="btn-download" disabled>ICS 다운로드</button>
+          <button type="button" class="btn btn-ghost" id="btn-copy" disabled>ICS 복사</button>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      Phase 1 · 순수 JS · 네트워크 요청 0 · 파서/ICS는 순수 함수(<code>parseSchedule</code>, <code>eventsToIcs</code>)로 분리되어 Phase 2에서 그대로 재사용합니다.
+    </footer>
+  </div>
+
+  <script>
+    /* ========================================================================
+     * CalPass core — Phase 1 pure functions (reuse in Phase 2)
+     * Export surface for later modules:
+     *   parseSchedule(text, options?) -> { events, warnings }
+     *   eventsToIcs(events, options?) -> string
+     * ======================================================================== */
+
+    /**
+     * @typedef {Object} CalEvent
+     * @property {string} uid
+     * @property {string} title
+     * @property {Date} start
+     * @property {Date} end
+     * @property {string} [location]
+     * @property {string} [description]
+     * @property {boolean} [allDay]
+     */
+
+    const WEEKDAY_KO = {
+      "일": 0, "월": 1, "화": 2, "수": 3, "목": 4, "금": 5, "토": 6
+    };
+
+    /** @param {string} s */
+    function pad2(s) {
+      return String(s).padStart(2, "0");
+    }
+
+    /** Escape text for ICS TEXT values (RFC 5545). Pure. */
+    function escapeIcsText(value) {
+      return String(value ?? "")
+        .replace(/\\/g, "\\\\")
+        .replace(/;/g, "\\;")
+        .replace(/,/g, "\\,")
+        .replace(/\r\n|\n|\r/g, "\\n");
+    }
+
+    /** Fold long ICS lines to 75 octets (approx for ASCII-heavy content). Pure. */
+    function foldIcsLine(line) {
+      const max = 75;
+      if (line.length <= max) return line;
+      let out = "";
+      let rest = line;
+      while (rest.length > max) {
+        out += rest.slice(0, max) + "\r\n ";
+        rest = rest.slice(max);
+      }
+      return out + rest;
+    }
+
+    /**
+     * Format Date as UTC ICS timestamp: YYYYMMDDTHHMMSSZ. Pure.
+     * @param {Date} date
+     */
+    function toIcsUtc(date) {
+      return (
+        date.getUTCFullYear() +
+        pad2(date.getUTCMonth() + 1) +
+        pad2(date.getUTCDate()) +
+        "T" +
+        pad2(date.getUTCHours()) +
+        pad2(date.getUTCMinutes()) +
+        pad2(date.getUTCSeconds()) +
+        "Z"
+      );
+    }
+
+    /**
+     * Format local all-day date: YYYYMMDD. Pure.
+     * @param {Date} date
+     */
+    function toIcsDateLocal(date) {
+      return (
+        date.getFullYear() +
+        pad2(date.getMonth() + 1) +
+        pad2(date.getDate())
+      );
+    }
+
+    /**
+     * Build a stable-ish UID from event fields. Pure.
+     * @param {Omit<CalEvent, "uid"> & { uid?: string }} event
+     * @param {number} index
+     */
+    function makeUid(event, index) {
+      if (event.uid) return event.uid;
+      const stamp = event.start instanceof Date ? toIcsUtc(event.start) : "nodate";
+      const slug = String(event.title || "event")
+        .toLowerCase()
+        .replace(/[^a-z0-9가-힣]+/gi, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 40);
+      return "calpass-" + stamp + "-" + index + "-" + slug + "@calpass.local";
+    }
+
+    /**
+     * Convert events to an iCalendar document string. Pure.
+     * @param {CalEvent[]} events
+     * @param {{ calendarName?: string, productId?: string, now?: Date }} [options]
+     * @returns {string}
+     */
+    function eventsToIcs(events, options) {
+      const opts = options || {};
+      const now = opts.now instanceof Date ? opts.now : new Date();
+      const productId = opts.productId || "-//CalPass//EN";
+      const calendarName = opts.calendarName || "CalPass";
+      const lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:" + productId,
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:" + escapeIcsText(calendarName)
+      ];
+
+      (events || []).forEach(function (ev, i) {
+        if (!ev || !(ev.start instanceof Date) || isNaN(ev.start.getTime())) return;
+        const end = ev.end instanceof Date && !isNaN(ev.end.getTime())
+          ? ev.end
+          : new Date(ev.start.getTime() + 60 * 60 * 1000);
+        const uid = makeUid(ev, i);
+        lines.push("BEGIN:VEVENT");
+        lines.push("UID:" + uid);
+        lines.push("DTSTAMP:" + toIcsUtc(now));
+        if (ev.allDay) {
+          const dayEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + (end <= ev.start ? 1 : 0));
+          lines.push("DTSTART;VALUE=DATE:" + toIcsDateLocal(ev.start));
+          lines.push("DTEND;VALUE=DATE:" + toIcsDateLocal(dayEnd));
+        } else {
+          lines.push("DTSTART:" + toIcsUtc(ev.start));
+          lines.push("DTEND:" + toIcsUtc(end));
+        }
+        lines.push("SUMMARY:" + escapeIcsText(ev.title || "Untitled"));
+        if (ev.location) lines.push("LOCATION:" + escapeIcsText(ev.location));
+        if (ev.description) lines.push("DESCRIPTION:" + escapeIcsText(ev.description));
+        lines.push("END:VEVENT");
+      });
+
+      lines.push("END:VCALENDAR");
+      return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+    }
+
+    /**
+     * Parse hour/minute from Korean or numeric time token. Pure.
+     * @param {string} raw
+     * @param {string} [ampmHint]
+     * @returns {{ h: number, m: number } | null}
+     */
+    function parseTimeToken(raw, ampmHint) {
+      if (!raw) return null;
+      let text = String(raw).trim();
+      let ampm = ampmHint || "";
+      const ampmMatch = text.match(/(오전|오후|AM|PM|am|pm)/);
+      if (ampmMatch) {
+        ampm = ampmMatch[1];
+        text = text.replace(ampmMatch[0], "").trim();
+      }
+
+      let h = null;
+      let m = 0;
+      const colon = text.match(/^(\d{1,2})\s*[:：]\s*(\d{1,2})$/);
+      const korean = text.match(/^(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?$/);
+      const bare = text.match(/^(\d{1,2})$/);
+      if (colon) {
+        h = Number(colon[1]);
+        m = Number(colon[2]);
+      } else if (korean) {
+        h = Number(korean[1]);
+        m = korean[2] ? Number(korean[2]) : 0;
+      } else if (bare) {
+        h = Number(bare[1]);
+      } else {
+        return null;
+      }
+      if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+
+      const isPm = /오후|PM|pm/.test(ampm);
+      const isAm = /오전|AM|am/.test(ampm);
+      if (isPm && h < 12) h += 12;
+      if (isAm && h === 12) h = 0;
+      return { h: h, m: m };
+    }
+
+    /**
+     * Resolve a date from Korean / numeric fragments. Pure.
+     * @param {object} parts
+     * @param {Date} ref
+     * @returns {Date | null}
+     */
+    function resolveDate(parts, ref) {
+      const base = ref instanceof Date ? new Date(ref.getTime()) : new Date();
+      let y = parts.year != null ? Number(parts.year) : base.getFullYear();
+      let mo = parts.month != null ? Number(parts.month) : null;
+      let d = parts.day != null ? Number(parts.day) : null;
+
+      if (parts.weekday && (mo == null || d == null)) {
+        const target = WEEKDAY_KO[parts.weekday];
+        if (target == null) return null;
+        const cur = base.getDay();
+        let delta = (target - cur + 7) % 7;
+        if (delta === 0 && parts.preferNext) delta = 7;
+        const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate() + delta);
+        return dt;
+      }
+
+      if (mo == null || d == null) return null;
+      if (y < 100) y += 2000;
+      mo = mo - 1;
+      if (mo < 0 || mo > 11 || d < 1 || d > 31) return null;
+      const dt = new Date(y, mo, d);
+      if (dt.getMonth() !== mo || dt.getDate() !== d) return null;
+      return dt;
+    }
+
+    /**
+     * Extract location from trailing @ / 장소: patterns. Pure.
+     * @param {string} line
+     * @returns {{ text: string, location: string }}
+     */
+    function extractLocation(line) {
+      let text = line;
+      let location = "";
+      const at = text.match(/\s+@\s*(.+)$/);
+      if (at) {
+        location = at[1].trim();
+        text = text.slice(0, at.index).trim();
+      }
+      const place = text.match(/(?:장소|위치)\s*[:：]\s*(.+)$/);
+      if (place) {
+        location = place[1].trim();
+        text = text.slice(0, place.index).trim();
+      }
+      return { text: text, location: location };
+    }
+
+    /**
+     * Try to parse one schedule line into an event skeleton. Pure.
+     * @param {string} line
+     * @param {Date} ref
+     * @returns {Omit<CalEvent, "uid"> | null}
+     */
+    function parseLine(line, ref) {
+      const trimmed = line.trim();
+      if (!trimmed || /^[#*>\-\/]{3,}/.test(trimmed)) return null;
+
+      const loc = extractLocation(trimmed);
+      let work = loc.text;
+
+      // Date patterns
+      const datePatterns = [
+        /(?<year>\d{4})\s*[.\-\/년]\s*(?<month>\d{1,2})\s*[.\-\/월]\s*(?<day>\d{1,2})\s*일?/,
+        /(?<month>\d{1,2})\s*[.\-\/월]\s*(?<day>\d{1,2})\s*일?/,
+        /(?<month>\d{1,2})\s*\/\s*(?<day>\d{1,2})(?:\s*\/\s*(?<year>\d{2,4}))?/
+      ];
+
+      let dateParts = null;
+      for (let i = 0; i < datePatterns.length; i++) {
+        const m = work.match(datePatterns[i]);
+        if (m) {
+          dateParts = {
+            year: m.groups.year,
+            month: m.groups.month,
+            day: m.groups.day
+          };
+          work = (work.slice(0, m.index) + " " + work.slice(m.index + m[0].length)).trim();
+          break;
+        }
+      }
+
+      const weekdayMatch = work.match(/(이번\s*)?(월|화|수|목|금|토|일)요일/);
+      if (weekdayMatch && !dateParts) {
+        dateParts = { weekday: weekdayMatch[2], preferNext: !weekdayMatch[1] };
+        work = (work.slice(0, weekdayMatch.index) + " " + work.slice(weekdayMatch.index + weekdayMatch[0].length)).trim();
+      }
+
+      // Time range patterns
+      const timeRangePatterns = [
+        /(?<ampm1>오전|오후|AM|PM|am|pm)?\s*(?<t1>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?|\d{1,2})\s*(?<ampm1b>오전|오후|AM|PM|am|pm)?\s*(?:~|～|–|—|-|부터|~)\s*(?<ampm2>오전|오후|AM|PM|am|pm)?\s*(?<t2>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?|\d{1,2})\s*(?<ampm2b>오전|오후|AM|PM|am|pm)?/,
+        /(?<ampm1>오전|오후|AM|PM|am|pm)?\s*(?<t1>\d{1,2}\s*[:：]\s*\d{1,2}|\d{1,2}\s*시(?:\s*\d{1,2}\s*분)?)\s*(?<ampm1b>오전|오후|AM|PM|am|pm)?/
+      ];
+
+      let startTime = null;
+      let endTime = null;
+      for (let i = 0; i < timeRangePatterns.length; i++) {
+        const m = work.match(timeRangePatterns[i]);
+        if (!m) continue;
+        const g = m.groups;
+        startTime = parseTimeToken(g.t1, g.ampm1 || g.ampm1b);
+        if (g.t2) endTime = parseTimeToken(g.t2, g.ampm2 || g.ampm2b || g.ampm1 || g.ampm1b);
+        work = (work.slice(0, m.index) + " " + work.slice(m.index + m[0].length)).trim();
+        break;
+      }
+
+      const date = resolveDate(dateParts || {}, ref);
+      if (!date && !startTime) {
+        // Title-only lines are ignored unless they look like dated bullets
+        return null;
+      }
+      if (!date) return null;
+
+      const title = work
+        .replace(/^[\s\-–—•·|/]+/, "")
+        .replace(/[\s\-–—|/]+$/, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+      if (!title) return null;
+
+      const allDay = !startTime;
+      let start;
+      let end;
+      if (allDay) {
+        start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        end = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      } else {
+        start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startTime.h, startTime.m, 0, 0);
+        if (endTime) {
+          end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endTime.h, endTime.m, 0, 0);
+          if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+        } else {
+          end = new Date(start.getTime() + 60 * 60 * 1000);
+        }
+      }
+
+      return {
+        title: title,
+        start: start,
+        end: end,
+        location: loc.location || "",
+        description: trimmed,
+        allDay: allDay
+      };
+    }
+
+    /**
+     * Parse free-form schedule text into calendar events. Pure.
+     * @param {string} text
+     * @param {{ referenceDate?: Date }} [options]
+     * @returns {{ events: CalEvent[], warnings: string[] }}
+     */
+    function parseSchedule(text, options) {
+      const opts = options || {};
+      const ref = opts.referenceDate instanceof Date ? opts.referenceDate : new Date();
+      const warnings = [];
+      const events = [];
+      const raw = String(text || "").replace(/\r\n/g, "\n");
+      if (!raw.trim()) {
+        return { events: [], warnings: ["입력 텍스트가 비어 있습니다."] };
+      }
+
+      const lines = raw.split("\n");
+      lines.forEach(function (line, idx) {
+        const parsed = parseLine(line, ref);
+        if (!parsed) {
+          if (line.trim()) {
+            // soft warning only for lines that look schedule-like
+            if (/\d/.test(line) || /시|요일|월|일/.test(line)) {
+              warnings.push((idx + 1) + "행을 해석하지 못했습니다: " + line.trim());
+            }
+          }
+          return;
+        }
+        events.push({
+          uid: makeUid(parsed, events.length),
+          title: parsed.title,
+          start: parsed.start,
+          end: parsed.end,
+          location: parsed.location,
+          description: parsed.description,
+          allDay: parsed.allDay
+        });
+      });
+
+      if (!events.length) {
+        warnings.push("인식된 이벤트가 없습니다. 날짜와 제목이 같은 줄에 있는지 확인해 주세요.");
+      }
+      return { events: events, warnings: warnings };
+    }
+
+    /* Expose pure API for Phase 2 reuse / console debugging */
+    window.CalPass = {
+      parseSchedule: parseSchedule,
+      eventsToIcs: eventsToIcs,
+      escapeIcsText: escapeIcsText,
+      parseLine: parseLine,
+      parseTimeToken: parseTimeToken
+    };
+
+    /* ========================================================================
+     * UI (side effects only below this line)
+     * ======================================================================== */
+
+    const SAMPLES = [
+      {
+        label: "트레인톤",
+        text: "2026-09-09 14:00-16:00 트레인톤 킥오프 @강릉 창업허브\n2026-09-10 10:00-11:30 멘토링 세션 / 연세대 창업지원단\n9월 11일 오후 3시 데모데이 리허설 장소: 강릉 아트센터"
+      },
+      {
+        label: "요일+오전",
+        text: "수요일 오전 10시 팀 스탠드업 @Zoom\n금요일 14:00–15:00 투자자 미팅"
+      },
+      {
+        label: "한글 날짜",
+        text: "2026년 9월 12일 09:30-12:00 최종 발표\n9월 13일 해커톤 정리 (하루종일)"
+      }
+    ];
+
+    const input = document.getElementById("input");
+    const preview = document.getElementById("preview");
+    const statusEl = document.getElementById("status");
+    const charCount = document.getElementById("char-count");
+    const btnParse = document.getElementById("btn-parse");
+    const btnClear = document.getElementById("btn-clear");
+    const btnDownload = document.getElementById("btn-download");
+    const btnCopy = document.getElementById("btn-copy");
+    const btnSample = document.getElementById("btn-sample");
+    const sampleList = document.getElementById("sample-list");
+
+    /** @type {CalEvent[]} */
+    let currentEvents = [];
+
+    function formatWhen(ev) {
+      const optsDate = { year: "numeric", month: "short", day: "numeric", weekday: "short" };
+      const optsTime = { hour: "2-digit", minute: "2-digit" };
+      if (ev.allDay) {
+        return ev.start.toLocaleDateString("ko-KR", optsDate) + " · 종일";
+      }
+      const sameDay = ev.start.toDateString() === ev.end.toDateString();
+      const start = ev.start.toLocaleString("ko-KR", Object.assign({}, optsDate, optsTime));
+      const end = sameDay
+        ? ev.end.toLocaleTimeString("ko-KR", optsTime)
+        : ev.end.toLocaleString("ko-KR", Object.assign({}, optsDate, optsTime));
+      return start + " – " + end;
+    }
+
+    function setStatus(message, kind) {
+      statusEl.textContent = message || "";
+      statusEl.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function renderPreview(events) {
+      preview.innerHTML = "";
+      if (!events.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "아직 파싱된 이벤트가 없습니다.";
+        preview.appendChild(empty);
+        btnDownload.disabled = true;
+        btnCopy.disabled = true;
+        return;
+      }
+      events.forEach(function (ev, i) {
+        const article = document.createElement("article");
+        article.className = "event";
+        article.style.animationDelay = (i * 0.05) + "s";
+        const h3 = document.createElement("h3");
+        h3.textContent = ev.title;
+        const dl = document.createElement("dl");
+        const when = document.createElement("dd");
+        when.className = "when";
+        when.textContent = formatWhen(ev);
+        dl.appendChild(when);
+        if (ev.location) {
+          const where = document.createElement("dd");
+          where.className = "where";
+          where.textContent = ev.location;
+          dl.appendChild(where);
+        }
+        article.appendChild(h3);
+        article.appendChild(dl);
+        preview.appendChild(article);
+      });
+      btnDownload.disabled = false;
+      btnCopy.disabled = false;
+    }
+
+    function runParse() {
+      const result = parseSchedule(input.value, { referenceDate: new Date() });
+      currentEvents = result.events;
+      renderPreview(currentEvents);
+      if (currentEvents.length && result.warnings.length) {
+        setStatus(currentEvents.length + "개 이벤트 · " + result.warnings[0], "warn");
+      } else if (currentEvents.length) {
+        setStatus(currentEvents.length + "개 이벤트를 인식했습니다.", "ok");
+      } else {
+        setStatus(result.warnings[0] || "이벤트를 찾지 못했습니다.", "err");
+      }
+    }
+
+    function downloadIcs() {
+      if (!currentEvents.length) return;
+      const ics = eventsToIcs(currentEvents, { calendarName: "CalPass" });
+      const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "calpass-" + toIcsDateLocal(new Date()) + ".ics";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      setStatus("ICS 파일을 저장했습니다.", "ok");
+    }
+
+    async function copyIcs() {
+      if (!currentEvents.length) return;
+      const ics = eventsToIcs(currentEvents, { calendarName: "CalPass" });
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(ics);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = ics;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        setStatus("ICS 내용을 클립보드에 복사했습니다.", "ok");
+      } catch (err) {
+        setStatus("복사에 실패했습니다. 다운로드를 사용해 주세요.", "err");
+      }
+    }
+
+    function updateCount() {
+      charCount.textContent = input.value.length + "자";
+    }
+
+    function fillSample(sample) {
+      input.value = sample.text;
+      updateCount();
+      runParse();
+      input.focus();
+    }
+
+    SAMPLES.forEach(function (sample) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip";
+      btn.textContent = sample.label;
+      btn.addEventListener("click", function () { fillSample(sample); });
+      sampleList.appendChild(btn);
+    });
+
+    btnParse.addEventListener("click", runParse);
+    btnClear.addEventListener("click", function () {
+      input.value = "";
+      currentEvents = [];
+      updateCount();
+      renderPreview([]);
+      setStatus("");
+      input.focus();
+    });
+    btnDownload.addEventListener("click", downloadIcs);
+    btnCopy.addEventListener("click", copyIcs);
+    btnSample.addEventListener("click", function () { fillSample(SAMPLES[0]); });
+    input.addEventListener("input", updateCount);
+    input.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        runParse();
+      }
+    });
+
+    updateCount();
+
+    // Lightweight self-checks (no network, console only)
+    (function selfCheck() {
+      const sample = SAMPLES[0].text;
+      const parsed = parseSchedule(sample, { referenceDate: new Date("2026-09-09T00:00:00") });
+      const ics = eventsToIcs(parsed.events, { now: new Date("2026-09-09T00:00:00Z") });
+      const ok = parsed.events.length >= 3 && /BEGIN:VCALENDAR/.test(ics) && /BEGIN:VEVENT/.test(ics);
+      if (!ok) console.warn("[CalPass] self-check failed", parsed, ics.slice(0, 200));
+      else console.info("[CalPass] self-check ok:", parsed.events.length, "events");
+    })();
+  </script>
+</body>
+</html>
