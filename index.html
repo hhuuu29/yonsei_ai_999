@@ -152,6 +152,30 @@
       opacity: 0;
       cursor: pointer;
     }
+    .api-key-wrap {
+      flex: 1 1 210px;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .api-key-wrap input {
+      min-width: 0;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.68rem 0.75rem;
+      background: var(--surface-solid);
+      color: var(--ink);
+      font: inherit;
+    }
+    .ai-state {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 0.76rem;
+      white-space: nowrap;
+    }
+    .ai-state.active { color: var(--accent); }
+    .ai-state.warn { color: var(--warn); }
 
     .status {
       min-height: 1.25rem;
@@ -283,6 +307,14 @@
       text-align: center;
       font-size: 0.95rem;
     }
+    .checklist, .todo-list {
+      margin: 0.55rem 0 0;
+      padding-left: 1.25rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .checklist li + li, .todo-list li + li { margin-top: 0.25rem; }
+    #todosSection[hidden] { display: none; }
 
     .export-bar {
       position: sticky;
@@ -338,6 +370,11 @@
           <input id="fileInput" type="file" accept=".txt,text/plain" />
         </label>
         <button type="button" class="btn btn-secondary" id="btnClear">비우기</button>
+        <label class="api-key-wrap">
+          <span class="sr-only">Gemini API 키</span>
+          <input id="apiKeyInput" type="password" autocomplete="off" placeholder="Gemini API 키 (세션에만 저장)" />
+          <span id="llmStatus" class="ai-state">AI 비활성</span>
+        </label>
         <button type="button" class="btn btn-primary" id="btnFind">일정 찾기</button>
       </div>
     </section>
@@ -352,6 +389,16 @@
       <div class="empty">아직 추출된 일정이 없습니다.</div>
     </div>
 
+    <section id="todosSection" hidden>
+      <div class="section-title">
+        <h2>할 일</h2>
+        <span id="todoCountLabel">0개</span>
+      </div>
+      <div class="card">
+        <ul id="todoList" class="todo-list"></ul>
+      </div>
+    </section>
+
     <div class="export-bar">
       <button type="button" class="btn btn-primary" id="btnExport" disabled>
         선택한 일정 .ics로 내보내기
@@ -359,6 +406,7 @@
     </div>
   </div>
 
+  <script src="llm-extractor.js"></script>
   <script>
 (function () {
   "use strict";
@@ -497,7 +545,19 @@
       }
       lines.push("SUMMARY:" + escapeIcsText(ev.title || "일정"));
       if (ev.location) lines.push("LOCATION:" + escapeIcsText(ev.location));
-      if (ev.description) lines.push("DESCRIPTION:" + escapeIcsText(ev.description));
+      var descriptionLines = [];
+      if (ev.description) descriptionLines.push(ev.description);
+      if (Array.isArray(ev.checklist)) {
+        ev.checklist.forEach(function (item) {
+          if (item && item.text) descriptionLines.push("• " + item.text);
+        });
+      }
+      if (Number.isInteger(ev.organizedMessageCount)) {
+        descriptionLines.push("— 두투두가 " + ev.organizedMessageCount + "개 메시지에서 정리했습니다");
+      }
+      if (descriptionLines.length) {
+        lines.push("DESCRIPTION:" + escapeIcsText(descriptionLines.join("\n")));
+      }
       lines.push("END:VEVENT");
     });
 
@@ -973,13 +1033,54 @@
   var statusEl = document.getElementById("status");
   var countLabel = document.getElementById("countLabel");
   var tooManyWarn = document.getElementById("tooManyWarn");
+  var apiKeyInput = document.getElementById("apiKeyInput");
+  var llmStatus = document.getElementById("llmStatus");
+  var todosSection = document.getElementById("todosSection");
+  var todoCountLabel = document.getElementById("todoCountLabel");
+  var todoList = document.getElementById("todoList");
 
   /** @type {Array} */
   var stateEvents = [];
+  var stateTodos = [];
+  var extractionRunId = 0;
+  var API_KEY_STORAGE = "talkcal.geminiApiKey";
 
   function setStatus(msg, kind) {
     statusEl.textContent = msg || "";
     statusEl.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function setLlmStatus(msg, kind) {
+    llmStatus.textContent = msg;
+    llmStatus.className = "ai-state" + (kind ? " " + kind : "");
+  }
+
+  function getStoredApiKey() {
+    try {
+      return sessionStorage.getItem(API_KEY_STORAGE) || "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  function storeApiKey(value) {
+    try {
+      if (value) sessionStorage.setItem(API_KEY_STORAGE, value);
+      else sessionStorage.removeItem(API_KEY_STORAGE);
+    } catch (err) {
+      setLlmStatus("키 저장 불가", "warn");
+    }
+  }
+
+  function renderTodos() {
+    todoList.innerHTML = "";
+    stateTodos.forEach(function (todo) {
+      var item = document.createElement("li");
+      item.textContent = todo.text;
+      todoList.appendChild(item);
+    });
+    todoCountLabel.textContent = stateTodos.length + "개";
+    todosSection.hidden = stateTodos.length === 0;
   }
 
   function updateTooManyWarning(count) {
@@ -1126,6 +1227,12 @@
           fields.appendChild(badge);
         });
       }
+      if (ev.suggestedDate) {
+        var suggested = document.createElement("div");
+        suggested.className = "warn-badge";
+        suggested.textContent = "제안 날짜: " + ev.suggestedDate;
+        fields.appendChild(suggested);
+      }
 
       var meta = document.createElement("div");
       meta.className = "meta";
@@ -1136,25 +1243,40 @@
       top.appendChild(fields);
       card.appendChild(top);
       card.appendChild(meta);
+      if (ev.checklist && ev.checklist.length) {
+        var checklist = document.createElement("ul");
+        checklist.className = "checklist";
+        ev.checklist.forEach(function (entry) {
+          var checklistItem = document.createElement("li");
+          checklistItem.textContent = entry.text;
+          checklist.appendChild(checklistItem);
+        });
+        card.appendChild(checklist);
+      }
       cardsEl.appendChild(card);
     });
 
     updateExportEnabled();
   }
 
-  function findSchedules() {
+  async function findSchedules() {
+    var runId = ++extractionRunId;
     try {
       var raw = chatInput.value;
       if (!String(raw || "").trim()) {
         stateEvents = [];
+        stateTodos = [];
         renderCards();
+        renderTodos();
         updateTooManyWarning(0);
         setStatus("대화 텍스트를 붙여넣거나 .txt를 업로드해 주세요.", "warn");
         return;
       }
       var result = parseScheduleFromKakao(raw);
       stateEvents = result.events;
+      stateTodos = [];
       renderCards();
+      renderTodos();
       updateTooManyWarning(stateEvents.length);
       if (!result.events.length) {
         setStatus(
@@ -1169,9 +1291,57 @@
           (result.warnings.length || result.events.length > 20) ? "warn" : "ok"
         );
       }
+
+      var apiKey = apiKeyInput.value.trim();
+      if (!apiKey) {
+        setLlmStatus("AI 비활성 · API 키 필요");
+        return;
+      }
+      if (!window.TalkCalLLM) {
+        setLlmStatus("AI 모듈 없음 · 룰 결과 사용", "warn");
+        return;
+      }
+
+      setLlmStatus("AI 정리 중…", "active");
+      var llmResult = await window.TalkCalLLM.extract({
+        apiKey: apiKey,
+        messages: result.messages,
+        ruleResult: result
+      });
+      if (runId !== extractionRunId) return;
+
+      if (llmResult.status === "success") {
+        stateEvents = sortEventsTimedFirst(llmResult.events.map(function (event, index) {
+          var source = result.messages[event.sourceMsgIndex];
+          event.sourceText = source ? source.text : "";
+          event.speaker = source ? source.speaker : "";
+          event.description = source
+            ? (source.speaker ? source.speaker + ": " : "") + source.text
+            : "";
+          event.organizedMessageCount = result.messages.length;
+          event.uid = makeUid(event, index);
+          return event;
+        }));
+        stateTodos = llmResult.todos;
+        renderCards();
+        renderTodos();
+        updateTooManyWarning(stateEvents.length);
+        setLlmStatus("AI 정리 완료", "active");
+        setStatus(
+          llmResult.summary || ("메시지 " + result.messages.length + "개를 AI로 정리했습니다."),
+          "ok"
+        );
+      } else if (llmResult.status === "rate_limited") {
+        setLlmStatus("잠시 후 다시 시도", "warn");
+        setStatus("잠시 후 다시 시도 · 룰 파서 결과를 유지합니다.", "warn");
+      } else {
+        setLlmStatus(llmResult.message || "AI 실패 · 룰 결과 사용", "warn");
+      }
     } catch (err) {
       stateEvents = [];
+      stateTodos = [];
       renderCards();
+      renderTodos();
       updateTooManyWarning(0);
       setStatus("파싱 중 오류가 발생했습니다: " + (err && err.message ? err.message : err), "err");
     }
@@ -1219,10 +1389,20 @@
 
   btnFind.addEventListener("click", findSchedules);
   btnExport.addEventListener("click", exportIcs);
+  apiKeyInput.value = getStoredApiKey();
+  setLlmStatus(apiKeyInput.value ? "AI 사용 가능" : "AI 비활성 · API 키 필요", apiKeyInput.value ? "active" : "");
+  apiKeyInput.addEventListener("input", function () {
+    var key = apiKeyInput.value.trim();
+    storeApiKey(key);
+    setLlmStatus(key ? "AI 사용 가능" : "AI 비활성 · API 키 필요", key ? "active" : "");
+  });
   btnClear.addEventListener("click", function () {
+    extractionRunId += 1;
     chatInput.value = "";
     stateEvents = [];
+    stateTodos = [];
     renderCards();
+    renderTodos();
     updateTooManyWarning(0);
     setStatus("");
     chatInput.focus();
