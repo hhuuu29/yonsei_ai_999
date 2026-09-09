@@ -3,10 +3,11 @@
 카톡 단톡방 export → 일정·챙길 것 추출 → 비서와 대화 → Google Calendar 등록.
 연세대 999 Trainthon 해커톤. 발표는 9/10 오전.
 
-## 현재 상태 (Phase 1 완료, 커밋 7e22e0d)
-- index.html 단일 파일, 순수 JS, 외부 의존성 0
+## 현재 상태 (Phase 2·나 필터·Vercel 배포 완료)
+- index.html + 순수 JS 모듈, 프레임워크·빌드 없음
 - window.DoToDo 순수 함수: parseKakaoMessages / parseScheduleFromKakao / eventsToIcs
-- 룰 파서는 폰 포맷으로만 검증됨. PC 포맷은 미검증
+- 폰·PC 포맷 모두 회귀 테스트 및 브라우저 흐름 검증 완료. LLM 응답 검증은 고정 fixture 기준
+- 라이브: https://dotodo-ten.vercel.app
 
 ## Phase 2 원칙
 - 프레임워크 마이그레이션 금지. 순수 JS, 모듈 파일만 추가
@@ -16,11 +17,13 @@
 - 기능 하나 끝날 때마다 main에 직접 커밋. PR 금지
 
 ## 작업 순서 (바꾸지 말 것)
-1. LLM 추출 레이어 — 노이즈 제거, 일정별 체크리스트, 최신 공지 반영
-2. UI 재구성 — 채팅 중심 + 타임라인 일정판 (mockup.html)
-3. 챗 비서 — 추출 컨텍스트로 질문/지시 처리
-4. Google Calendar — 등록 + 기존 일정 읽어 충돌 표시
-5. GitHub Pages 배포
+1. [완료] LLM 추출 레이어 — 노이즈 제거, 일정별 체크리스트, 최신 공지 반영
+2. [완료] UI 재구성 — 채팅 중심 + 타임라인 일정판 (mockup.html)
+3. [완료] 챗 비서 — 추출 컨텍스트로 질문/지시 처리
+4. [완료] Google Calendar — 등록 + 기존 일정 읽어 충돌 표시
+5. [완료] Vercel 배포 — GitHub Pages 계획을 대체, 프로젝트 dotodo
+6. [완료] 나 필터 — 이름 선택·저장, 대상별 일정판, 근거 이름 하이라이트
+7. [완료] 데모 준비 — PC 대화 불러오기 버튼, composer 44px, 추출 로딩 말풍선
 
 ## 데모 데이터 (data/)
 - trainthon-mobile.txt: 폰 카톡 내보내기 (9/9 08:13 기준)
