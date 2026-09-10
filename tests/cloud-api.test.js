@@ -28,13 +28,6 @@ test('다른 Origin의 쓰기와 비로그인 저장을 거절한다',async()=>{
   assert.equal((await call(handler,{action:'save',snapshot},'POST','','https://evil.test')).code,403);
   assert.equal((await call(handler,{action:'save',snapshot},'POST','')).code,401);
 });
-test('이메일 인증은 HttpOnly Secure 쿠키에만 세션을 담는다',async()=>{
-  const handler=createHandler({config,fetchImpl:async()=>ok({access_token:'private-access',refresh_token:'private-refresh',expires_in:3600,user:{id:userId,email:'me@example.test'}})});
-  const res=await call(handler,{action:'verify',email:'me@example.test',code:'123456'},'POST','');
-  assert.equal(res.code,200);
-  assert.equal(JSON.stringify(res.body).includes('private-'),false);
-  assert.match(res.headers['Set-Cookie'][0],/HttpOnly; Secure; SameSite=Lax/);
-});
 test('사용자 ID는 요청 본문이 아닌 검증된 로그인에서 가져온다',async()=>{
   const requests=[];
   const handler=createHandler({config,fetchImpl:async(url,options)=>{
@@ -117,4 +110,29 @@ test('큰 요청과 GET을 이용한 상태 변경은 거절한다',async()=>{
   const handler=createHandler({config,fetchImpl:()=>{throw Error('must not run');}});
   assert.equal((await call(handler,{action:'save',padding:'a'.repeat(200001)})).code,413);
   assert.equal((await call(handler,{action:'logout'},'GET')).code,405);
+});
+
+
+test('Google session exchanges a bound nonce and never returns tokens',async()=>{
+  let exchange;
+  const handler=createHandler({config,fetchImpl:async(url,options)=>{
+    assert.ok(url.endsWith('/auth/v1/token?grant_type=id_token'));exchange=JSON.parse(options.body);
+    return ok({access_token:'private-access',refresh_token:'private-refresh',user:{id:userId,email:'me@example.test'}});
+  }});
+  const challenge=await call(handler,{action:'google_nonce'},'POST','');
+  const binding=challenge.headers['Set-Cookie'][0].split(';')[0];
+  assert.match(challenge.headers['Set-Cookie'][0],/HttpOnly; Secure; SameSite=Lax/);
+  assert.equal(challenge.body.nonce,crypto.createHash('sha256').update(binding.split('=')[1]).digest('hex'));
+  assert.equal((await call(handler,{action:'google_verify',credential:'id-token'},'POST','')).code,400);
+  assert.equal(exchange,undefined);
+  const result=await call(handler,{action:'google_verify',credential:'id-token'},'POST',binding);
+  assert.equal(result.code,200);assert.equal(exchange.provider,'google');assert.equal(exchange.id_token,'id-token');
+  assert.equal(exchange.nonce,binding.split('=')[1]);assert.equal(JSON.stringify(result.body).includes('private-'),false);
+  assert.ok(result.headers['Set-Cookie'].some(c=>c.startsWith('__Host-dotodo_nonce=; Max-Age=0')));
+});
+test('Google login rejects expired nonce and cross origin requests',async()=>{
+  const handler=createHandler({config,fetchImpl:()=>{throw Error('must not exchange');}});
+  const expired='__Host-dotodo_nonce='+(Date.now()-610000)+'.'+crypto.randomBytes(32).toString('base64url');
+  assert.equal((await call(handler,{action:'google_verify',credential:'id'},'POST',expired)).code,400);
+  assert.equal((await call(handler,{action:'google_nonce'},'POST','','https://evil.test')).code,403);
 });

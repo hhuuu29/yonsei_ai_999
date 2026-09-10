@@ -15,11 +15,16 @@ function createHandler(options={}){
     const cfg={...rawConfig,url:String(rawConfig.url||'').trim().replace(/\/$/,'')};
     const fetchImpl=options.fetchImpl||fetch;
     const cookie=Object.fromEntries(String(req.headers.cookie||'').split(';').map(v=>{const p=v.trim().indexOf('=');return p<0?['','']:[v.trim().slice(0,p),v.trim().slice(p+1)];}));
+    const extraCookies=[];
+    function nonceCookie(value,age){
+      extraCookies.push('__Host-dotodo_nonce='+value+'; Max-Age='+age+'; Path=/; HttpOnly; Secure; SameSite=Lax');
+      res.setHeader('Set-Cookie',extraCookies);
+    }
     function sessionCookies(session){
       const suffix='; Path=/; HttpOnly; Secure; SameSite=Lax';
       res.setHeader('Set-Cookie',[
         '__Host-dotodo_access='+(session?.access_token||'')+'; Max-Age='+(session?Math.min(Number(session.expires_in)||3600,86400):0)+suffix,
-        '__Host-dotodo_refresh='+(session?.refresh_token||'')+'; Max-Age='+(session?2592000:0)+suffix
+        '__Host-dotodo_refresh='+(session?.refresh_token||'')+'; Max-Age='+(session?2592000:0)+suffix,...extraCookies
       ]);
     }
     async function sb(path,{method='GET',body,token,admin=false,headers={}}={}){
@@ -65,15 +70,21 @@ function createHandler(options={}){
       const rateKey=String(req.headers['x-forwarded-for']||'unknown').split(',')[0]+':'+action;
       const now=Date.now(),bucket=limits.get(rateKey)||{time:now,count:0};
       if(now-bucket.time>60000){bucket.time=now;bucket.count=0;}
-      if(++bucket.count>(['otp','verify'].includes(action)?6:60))issue(429,'RATE_LIMIT');
+      if(++bucket.count>(['google_verify','google_nonce'].includes(action)?6:60))issue(429,'RATE_LIMIT');
       if(limits.size>4096)limits.clear();limits.set(rateKey,bucket);
-      if(action==='otp'||action==='verify'){
-        if(typeof body.email!=='string'||body.email.length>254||!/^\S+@\S+\.\S+$/.test(body.email))issue(400,'INVALID_INPUT');
-        const email=body.email.trim().toLowerCase();
-        if(action==='otp'){await sb('/auth/v1/otp',{method:'POST',body:{email,create_user:true}});return res.status(200).json({sent:true});}
-        if(!/^\d{6,10}$/.test(body.code||''))issue(400,'INVALID_INPUT');
-        const session=await sb('/auth/v1/verify',{method:'POST',body:{email,token:body.code,type:'email'}});
-        if(!session?.access_token||!session.refresh_token||!session.user)issue(502,'AUTH_FAILED');
+      if(action==='google_nonce'){
+        const nonce=Date.now()+'.'+crypto.randomBytes(32).toString('base64url');
+        nonceCookie(nonce,600);
+        return res.status(200).json({nonce:crypto.createHash('sha256').update(nonce).digest('hex')});
+      }
+      if(action==='google_verify'){
+        const nonce=cookie['__Host-dotodo_nonce']||'';
+        nonceCookie('',0);
+        if(!/^\d{13}\.[A-Za-z0-9_-]{43}$/.test(nonce)||Date.now()-Number(nonce.split('.')[0])>600000||Number(nonce.split('.')[0])>Date.now()||typeof body.credential!=='string'||body.credential.length>12000||!body.credential)issue(400,'GOOGLE_LOGIN_FAILED');
+        let session;
+        try{session=await sb('/auth/v1/token?grant_type=id_token',{method:'POST',body:{provider:'google',id_token:body.credential,nonce}});}
+        catch(error){if(error.status===400||error.status===401)issue(400,'GOOGLE_LOGIN_FAILED');throw error;}
+        if(!session?.access_token||!session.refresh_token||!session.user)issue(502,'GOOGLE_LOGIN_FAILED');
         sessionCookies(session);return res.status(200).json({user:{id:session.user.id,email:session.user.email}});
       }
       if(action==='refresh'){

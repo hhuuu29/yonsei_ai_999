@@ -28,12 +28,12 @@
 8. [완료] 기본 AI 서버 연결·UI 개편 — Vercel 환경변수, 선택형 개인 키, 클립 첨부 아이콘. 가상 일정으로 실제 Gemini 추출·비서 응답 검증
 9. Google Calendar 서비스 기본 연결 — GOOGLE_CLIENT_ID 환경변수, 사용자 설정 입력 없음, 동의 후 직접 등록. 자동 ICS 폴백 제거. 실서비스 OAuth 설정 대기
 10. [구현 완료·실계정 검증 대기] 앱 내 캘린더 관리 — 헤더 캘린더 버튼, 월간·일별 조회, 생성·수정·삭제. 페이지네이션, ETag 충돌 검사, 새 일정 생성 재시도 중복 방지. 참석자가 있는 일정은 읽기 전용. 모의 API 브라우저 검증 완료
-11. [구현 완료·운영 연결 대기] 개인 보관함·친구 공유 — Supabase 이메일 OTP, 서버 세션 쿠키, 일정·할 일 사본 저장/복원/삭제. 가입 없는 링크 미리보기, 수신자 Google 등록, 7일 만료·해제·중복 방지. 모의 API 브라우저와 로컬 PostgreSQL RLS 검증 완료. 설치: docs/plans/2026-09-10-cloud-setup.md
+11. [구현 완료·운영 연결 대기] 개인 보관함·친구 공유 — Supabase Google 로그인, 서버 세션 쿠키, 일정·할 일 사본 저장/복원/삭제. 가입 없는 링크 미리보기, 수신자 Google 등록, 7일 만료·해제·중복 방지. 모의 API 브라우저와 로컬 PostgreSQL RLS 검증 완료. 설치: docs/plans/2026-09-10-cloud-setup.md
 
 ## 첫 운영 버전 확정 (2026-09-10)
 - 개인 비서 + 친구에게 일정 공유. 팀 공동 편집은 이후 범위
 - 설계: docs/plans/2026-09-10-personal-assistant-design.md
-- 새 Supabase 프로젝트 연결·Email 인증 활성화 확인, Vercel Production 서버 환경변수 3개 등록 완료. 운영 SQL 설치와 실제 Auth·REST 저장/복원·계정 격리·공유 해제 검증 완료. Security Advisor 오류·경고 0건. 일반 사용자 로그인은 Custom SMTP 또는 Google 로그인 연결 필요
+- 새 Supabase 프로젝트 연결·Email 인증 활성화 확인, Vercel Production 서버 환경변수 3개 등록 완료. 운영 SQL 설치와 실제 Auth·REST 저장/복원·계정 격리·공유 해제 검증 완료. Security Advisor 오류·경고 0건. Google 공급자·OAuth 콜백·Site URL 연결 완료. Google 앱 공개와 실계정 로그인 검증은 대기
 - 현재 캘린더는 로그인한 Google 계정의 기본 캘린더를 직접 사용. 토큰은 메모리에만 보관하고 자동 백그라운드 동기화는 제공하지 않음
 
 ## 데모 데이터 (data/)

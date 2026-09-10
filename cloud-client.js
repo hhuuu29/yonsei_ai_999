@@ -2,7 +2,7 @@
   'use strict';
   var doc=root.document,refreshing=null;
   var messages={NOT_CONFIGURED:'보관함 서비스를 준비 중이에요. 운영 연결이 끝나면 사용할 수 있어요.',
-    LOGIN_REQUIRED:'로그인이 필요해요.',AUTH_FAILED:'이메일과 인증번호를 확인해 주세요. 메일이 오지 않으면 잠시 후 다시 요청해 주세요.',
+    LOGIN_REQUIRED:'로그인이 필요해요.',AUTH_FAILED:'Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',GOOGLE_LOGIN_FAILED:'로그인 요청이 만료됐어요. 다시 Google 계정을 선택해 주세요.',
     RATE_LIMIT:'요청이 많아요. 잠시 후 다시 시도해 주세요.',INVALID_INPUT:'제목·일정 수·날짜를 확인해 주세요. 최대 30개 일정을 담을 수 있어요.',
     STORAGE_FAILED:'저장소에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',LINK_UNAVAILABLE:'만료되었거나 해제된 공유 링크예요.',
     GOOGLE_AUTH:'Google 연결이 만료됐어요. 다시 연결해 주세요.',IMPORT_FAILED:'일부 일정을 등록하지 못했어요. 다시 누르면 이미 등록한 일정은 건너뜁니다.'};
@@ -58,17 +58,34 @@
         try{await request({action:'logout'},false);}finally{user=null;draft=null;content.replaceChildren();options.onLogout();login();say('로그아웃했어요.');}
       });});
     }
-    function login(){
+    async function login(){
       heading.textContent='일정을 내 계정에 보관하기';navigation();content.replaceChildren();
-      content.appendChild(node('p','이메일 인증번호로 로그인하세요. 원문 없이 일정과 할 일만 보관합니다.'));
-      var form=node('form'),label=node('label','이메일'),email=node('input');email.type='email';email.required=true;email.autocomplete='email';label.appendChild(email);form.appendChild(label);
-      var codeLabel=node('label','인증번호'),code=node('input');code.inputMode='numeric';code.autocomplete='one-time-code';code.pattern='[0-9]{6,10}';codeLabel.appendChild(code);form.appendChild(codeLabel);
-      var send=button(form,'인증번호 받기',function(){if(!email.reportValidity())return;task(async function(){await request({action:'otp',email:email.value},false);say('이메일로 보낸 인증번호를 입력해 주세요.');});});
-      var verify=node('button','로그인','cloud-primary');verify.type='submit';form.appendChild(verify);
-      form.addEventListener('submit',function(event){event.preventDefault();if(!code.value){say('인증번호를 입력해 주세요.');return;}task(async function(){
-        var data=await request({action:'verify',email:email.value,code:code.value},false);user=data.user;
-        if(draft)compose();else await library();
-      });});content.appendChild(form);
+      content.appendChild(node('p','Google 계정으로 로그인하고 내 일정을 보관하세요. 원문 없이 일정과 할 일만 저장합니다.'));
+      content.appendChild(node('p','캘린더 접근은 캘린더 기능을 사용할 때 별도로 동의해요.'));
+      var target=node('div');content.appendChild(target);
+      try{
+        var configResponse=await root.fetch('/api/config');
+        if(!configResponse.ok)throw new Error('로그인 설정을 불러오지 못했어요.');
+        var config=await configResponse.json();
+        if(!config.googleClientId||!root.google?.accounts?.id)throw new Error('Google 로그인을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+        if(!content.contains(target)||!dialog.open)return;
+        var challenge=await request({action:'google_nonce'},false);
+        if(!content.contains(target)||!dialog.open)return;
+        root.google.accounts.id.initialize({client_id:config.googleClientId,nonce:challenge.nonce,auto_select:false,
+          callback:function(response){
+            if(!content.contains(target)||!dialog.open)return;
+            task(async function(){
+              try{
+                var data=await request({action:'google_verify',credential:response.credential},false);user=data.user;
+                if(draft)compose();else await library();
+              }catch(error){await login();throw error;}
+            });
+          }});
+        root.google.accounts.id.renderButton(target,{type:'standard',theme:'outline',size:'large',text:'continue_with',width:280,locale:'ko'});
+      }catch(error){
+        if(!content.contains(target))return;
+        say(error.message);button(target,'로그인 다시 준비하기',function(){login();});
+      }
     }
     async function session(){
       try{var data=await request({action:'session'});user=data.user;return true;}

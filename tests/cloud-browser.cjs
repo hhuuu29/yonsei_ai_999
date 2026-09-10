@@ -19,7 +19,12 @@ const handler=createHandler({config,fetchImpl:async(url,options)=>{
     return ok({access_token:'access'+i,refresh_token:'refresh'+i,expires_in:3600,user:{id:ids[i],email:body.email}});
   }
   if(address.pathname==='/auth/v1/logout')return ok(null,204);
-  if(address.pathname==='/auth/v1/token')return ok({},401);
+  if(address.pathname==='/auth/v1/token'){
+    if(address.searchParams.get('grant_type')!=='id_token')return ok({},401);
+    assert.equal(body.provider,'google');assert.ok(body.nonce);
+    const i=body.id_token==='owner-credential'?0:1;
+    return ok({access_token:'access'+i,refresh_token:'refresh'+i,expires_in:3600,user:{id:ids[i],email:i?'other@example.test':'owner@example.test'}});
+  }
   if(address.pathname==='/auth/v1/user'){
     const i=Number(access.slice(-1));return /^access[01]$/.test(access)?ok({id:ids[i],email:i?'other@example.test':'owner@example.test'}):ok({},401);
   }
@@ -64,6 +69,13 @@ const server=http.createServer(async(req,res)=>{
     await context.route('https://accounts.google.com/**',route=>route.abort());
     await context.route('**/api/config',route=>route.fulfill({json:{googleClientId:'test.apps.googleusercontent.com'}}));
     await context.addInitScript(()=>{window.google={accounts:{oauth2:{initTokenClient(config){return {requestAccessToken(){config.callback({access_token:'fake-google',expires_in:3600});}};}}}};});
+    await context.addInitScript(()=>{
+      window.testGoogleCredential='owner-credential';let settings;
+      window.google.accounts.id={initialize(value){settings=value;},renderButton(target){
+        const button=document.createElement('button');button.textContent='Google 계정으로 계속하기';
+        button.onclick=()=>settings.callback({credential:window.testGoogleCredential});target.appendChild(button);
+      }};
+    });
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.route('**/api/gemini',route=>route.fulfill({json:{candidates:[{content:{parts:[{text:JSON.stringify({events:[{title:'가상 회의',confidence:0.95,start:'2026-09-10T09:00:00+09:00',end:'2026-09-10T10:00:00+09:00',audience:'all',sourceMsgIndex:0,checklist:[{text:'노트',audience:'all',sourceMsgIndex:0},{text:'보내지 않을 항목',audience:'all',sourceMsgIndex:0}]}],todos:[],teams:[],summary:'가상 일정입니다.'})}]}}]}}));
     await page.goto(config.origin);
@@ -71,11 +83,7 @@ const server=http.createServer(async(req,res)=>{
     assert.equal(await page.locator('#btnSaveCloud').isDisabled(),false,await page.locator('#chat').innerText());
     await page.locator('#btnSaveCloud').click();
     const dialog=page.getByRole('dialog',{name:'일정을 내 계정에 보관하기'});
-    await dialog.getByLabel('이메일',{exact:true}).fill('owner@example.test');
-    await dialog.getByRole('button',{name:'인증번호 받기'}).click();
-    await dialog.getByText('이메일로 보낸 인증번호를 입력해 주세요.').waitFor();
-    await dialog.getByLabel('인증번호',{exact:true}).fill('123456');
-    await dialog.getByRole('button',{name:'로그인',exact:true}).click();
+    await dialog.getByRole('button',{name:'Google 계정으로 계속하기'}).click();
     const panel=page.locator('.cloud-panel');
     await panel.getByRole('button',{name:'이 내용으로 저장',exact:true}).click();
     await panel.getByText('내 보관함에 저장했어요.').waitFor();
@@ -111,8 +119,8 @@ const server=http.createServer(async(req,res)=>{
     page.once('dialog',popup=>popup.accept());await panel.getByRole('button',{name:'일정판에서 열기'}).click();
     await page.getByText('보관함의 일정과 할 일을 열었어요. 원문 대화는 저장하지 않아 근거를 다시 확인할 수 없어요.').waitFor();
     await page.locator('#openLibrary').click();await panel.getByRole('button',{name:'로그아웃',exact:true}).click();
-    await panel.getByLabel('이메일',{exact:true}).fill('other@example.test');
-    await panel.getByLabel('인증번호',{exact:true}).fill('123456');await panel.getByRole('button',{name:'로그인',exact:true}).click();
+    await page.evaluate(()=>window.testGoogleCredential='other-credential');
+    await panel.getByRole('button',{name:'Google 계정으로 계속하기'}).click();
     await panel.getByText(/아직 저장한 일정이 없어요/).waitFor();
     const denied=await page.evaluate(async id=>{const response=await fetch('/api/cloud?action=load&id='+id);return response.status;},tables.dotodo_records[0].id);
     assert.equal(denied,404);
@@ -120,7 +128,7 @@ const server=http.createServer(async(req,res)=>{
     assert.equal(await panel.evaluate(node=>node.scrollWidth<=node.clientWidth),true);
     if(process.env.DOTODO_SCREENSHOT_DIR){fs.mkdirSync(process.env.DOTODO_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.DOTODO_SCREENSHOT_DIR,'cloud-mobile.png')});}
     assert.deepEqual(errors,[]);
-    console.log('PASS cloud: real handlers with mocked upstream; OTP cookies, save/reload, field exclusion, unauthenticated share, idempotent import, revoke, logout and account isolation');
+    console.log('PASS cloud: real handlers with mocked upstream; Google login cookies, save/reload, field exclusion, unauthenticated share, idempotent import, revoke, logout and account isolation');
     await friendContext.close();await context.close();
   }finally{if(browser)await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

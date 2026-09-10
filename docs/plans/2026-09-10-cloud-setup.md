@@ -5,15 +5,15 @@
 - dotodo Supabase 프로젝트에 `10_personal_library.sql` 설치 완료. 두 테이블의 REST 조회 정상, Security Advisor 오류·경고 0건.
 - Vercel Production에 Supabase 서버 환경변수 3개 등록 완료.
 - 실제 Supabase Auth·REST에서 가상 계정 2개로 저장/복원, 재시도 중복 방지, 계정 간 접근 차단, 공유 생성/미리보기/해제 검증 완료. 검증 후 세션을 해제하고 가상 계정·데이터를 삭제했다.
-- 일반 사용자 이메일 OTP 발송은 미완료. 현재 무료 프로젝트는 Custom SMTP 없이 메일 템플릿을 바꿀 수 없고, 기본 발송 대상도 프로젝트 팀 이메일로 제한된다. SMTP 연결 또는 Google 로그인 선택이 필요하다.
+- Supabase Google 공급자 활성화, 기존 웹 Client ID/Secret 연결, Google OAuth 콜백·Supabase Site URL 설정 완료. Google 앱은 현재 테스트 상태이며 실계정 로그인 최종 확인과 공개 설정이 남아 있다.
 - 실제 이메일 수신과 실계정 Google 캘린더 등록은 위 DB 검증에 포함하지 않았다.
 
 ## 구현 범위
 
-순수 JS와 Vercel 서버 함수를 유지한다. Supabase Auth 이메일 OTP로 로그인하고 PostgreSQL에 선택한 일정·할 일의 사본을 저장한다. 보관함과 Google 계정 연결은 별개다. Google 캘린더의 자동 백그라운드 동기화는 포함하지 않는다.
+순수 JS와 Vercel 서버 함수를 유지한다. Supabase Auth Google 계정로 로그인하고 PostgreSQL에 선택한 일정·할 일의 사본을 저장한다. 보관함과 Google 계정 연결은 별개다. Google 캘린더의 자동 백그라운드 동기화는 포함하지 않는다.
 
 - `snapshot.js`: 저장·공유용 허용 필드 검증. 원문·발신자·API 키·대상 명단·Google 참석자 정보를 제거한다.
-- `api/cloud.js`: OTP·서버 세션 쿠키·보관함 CRUD·공유 생성/해제/조회/Google 등록. Supabase REST와 Auth API를 서버에서 호출한다.
+- `api/cloud.js`: Google ID 토큰 검증·서버 세션 쿠키·보관함 CRUD·공유 생성/해제/조회/Google 등록. Supabase REST와 Auth API를 서버에서 호출한다.
 - `cloud-client.js`, `cloud.css`: 보관함, 로그인, 저장·공유 미리보기. 체크리스트를 공유에서 제외할 수 있다.
 - `share.html`, `share.js`: 가입 없는 공유 미리보기와 수신자의 Google 계정 등록.
 - `supabase/schemas/10_personal_library.sql`: 새 프로젝트용 트랜잭션 SQL. 소유자별 RLS, 공유 내용 불변, 해제 후 재활성화 금지.
@@ -37,20 +37,17 @@ Supabase SQL Editor에서 `supabase/schemas/10_personal_library.sql` 전체를 *
 
 Data API에서 public 스키마가 활성화되어 있어야 한다. SQL은 authenticated의 필요한 권한과 소유자 RLS를 함께 설정하며 anon에는 테이블 접근을 허용하지 않는다. 공개 링크 조회는 서버의 secret/service role 키가 해시·만료·해제 조건으로 조회한다. SQL 설치 후 Supabase Security Advisor도 확인한다.
 
-## 3. 이메일 로그인 설정
+## 3. Google 로그인 설정
 
-Authentication에서 Email 로그인을 활성화한다. 이메일 OTP는 기본 Magic Link 템플릿을 그대로 두면 번호가 표시되지 않는다. Authentication → Email Templates → Magic Link의 본문을 다음처럼 설정한다.
+기존 Google Cloud 웹 OAuth 클라이언트의 Client ID와 Client Secret을 Supabase → Authentication → Sign In / Providers → Google에 등록하고 활성화한다. Skip nonce checks는 끈 상태로 유지한다. Client Secret은 Supabase 설정에만 필요하며 앱의 공개 설정이나 Vercel 함수에는 넣지 않는다. `.env.local`의 `GOOGLE_CLIENT_SECRET`은 운영 설정을 전달할 때만 사용한다.
 
-```html
-<h2>두투두 로그인 인증번호</h2>
-<p>두투두 화면에 아래 인증번호를 입력해 주세요.</p>
-<p><strong>{{ .Token }}</strong></p>
-<p>로그인을 요청하지 않았다면 이 메일을 무시해 주세요.</p>
-```
+- Google 승인된 JavaScript 원본: `https://dotodo-ten.vercel.app`
+- Google 승인된 리디렉션 URI: `https://jwrdoeefnznwmtceecrf.supabase.co/auth/v1/callback`
+- Supabase Site URL: `https://dotodo-ten.vercel.app`
 
-Site URL은 `https://dotodo-ten.vercel.app`으로 설정한다. 일반 사용자에게 인증번호를 보내려면 Custom SMTP를 연결한다. Supabase 기본 SMTP는 프로젝트 팀에 속한 이메일만 대상으로 하며 운영용이 아니다. 새 무료 프로젝트의 기본 SMTP에서는 템플릿 변경도 제한될 수 있다. SMTP 계정·발신 주소는 운영자가 선택하고 등록한다. 앱 코드는 실제 이메일을 테스트 목적으로 임의 발송하지 않는다.
+로그인 화면은 Google의 공식 버튼을 사용한다. 서버가 10분 nonce를 HttpOnly 쿠키에 저장하고 해시만 Google에 전달한다. ID 토큰과 원본 nonce를 Supabase에 교환해 받은 세션은 HttpOnly 쿠키에만 저장한다. 로그인 실패 시 새 nonce로 다시 준비한다. 기존 이메일 OTP 화면과 서버 발송 경로는 제거했다. 캘린더 동의는 별도로 받는다.
 
-참고: [이메일 OTP](https://supabase.com/docs/guides/auth/auth-email-passwordless), [Custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [변경 내역](https://supabase.com/changelog).
+참고: [Google 로그인](https://supabase.com/docs/guides/auth/social-login/auth-google).
 
 ## 4. Vercel 환경변수와 배포
 
@@ -82,6 +79,6 @@ node tests/cloud-rls.cjs
 
 브라우저 테스트에는 Playwright가 필요하다. RLS 테스트는 테스트 전용 `@electric-sql/pglite@0.3.14`를 NODE_PATH 또는 `.vercel/qa-deps`에 설치해 실행한다. 운영 앱에 패키지 의존성을 추가하지 않는다.
 
-`cloud-browser.cjs`는 실제 서버 핸들러와 가상 Supabase·Google 응답으로 이메일 인증 쿠키, 저장·새로고침·복원, 공유 필드 제외, 비로그인 수신자 등록, 재시도, 링크 해제, 계정 간 접근 차단을 확인한다. `cloud-rls.cjs`는 실제 PostgreSQL 엔진에서 SQL 설치·RLS·권한을 검증하지만 운영 Supabase의 Auth·REST 게이트웨이 설정까지 검증하지는 않는다.
+`cloud-browser.cjs`는 실제 서버 핸들러와 가상 Supabase·Google 응답으로 Google 로그인 쿠키, 저장·새로고침·복원, 공유 필드 제외, 비로그인 수신자 등록, 재시도, 링크 해제, 계정 간 접근 차단을 확인한다. `cloud-rls.cjs`는 실제 PostgreSQL 엔진에서 SQL 설치·RLS·권한을 검증하지만 운영 Supabase의 Auth·REST 게이트웨이 설정까지 검증하지는 않는다.
 
-운영 키·SQL·메일 설정 후에는 운영자가 로그인하고, 별도 계정에서 사본이 보이지 않는지, 친구가 공유 링크로 가상 일정을 등록하는지 확인한다. 실제 개인 대화나 실제 친구 캘린더를 에이전트가 임의 테스트 대상으로 사용하지 않는다.
+운영 키·SQL·Google 설정 후에는 운영자가 로그인하고, 별도 계정에서 사본이 보이지 않는지, 친구가 공유 링크로 가상 일정을 등록하는지 확인한다. 실제 개인 대화나 실제 친구 캘린더를 에이전트가 임의 테스트 대상으로 사용하지 않는다.
