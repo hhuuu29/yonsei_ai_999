@@ -297,20 +297,23 @@
   }
 
   async function calendarFetch(accessToken, url, options, fetchImpl) {
-    var response = await fetchImpl(url, Object.assign({
-      headers: {
+    var response = await (fetchImpl || root.fetch)(url, Object.assign({}, options || {}, {
+      headers: Object.assign({
         Authorization: "Bearer " + accessToken,
         "Content-Type": "application/json"
-      }
-    }, options || {}));
-    if (response.status === 401 || response.status === 403) {
+      }, options && options.headers)
+    }));
+    if (response.status === 401) {
       var authError = new Error("Google Calendar 인증이 만료되었어요.");
       authError.code = "AUTH";
       throw authError;
     }
     if (!response.ok) {
-      throw new Error("Google Calendar HTTP " + response.status);
+      var error = new Error("Google Calendar HTTP " + response.status);
+      error.code = ({403: "FORBIDDEN", 404: "NOT_FOUND", 409: "EXISTS", 412: "CONFLICT", 429: "RATE_LIMIT"})[response.status] || "HTTP";
+      throw error;
     }
+    if (response.status === 204) return null;
     return response.json();
   }
 
@@ -322,13 +325,42 @@
       timeMin: formatSeoulOffset(range.start),
       timeMax: formatSeoulOffset(range.end)
     });
-    var data = await calendarFetch(
+    var items = [];
+    var data;
+    do {
+      data = await calendarFetch(
       accessToken,
       CALENDAR_API + "?" + params.toString(),
       { method: "GET" },
       fetchImpl
     );
-    return Array.isArray(data.items) ? data.items : [];
+      items = items.concat(Array.isArray(data.items) ? data.items : []);
+      if (data.nextPageToken) params.set("pageToken", data.nextPageToken);
+    } while (data.nextPageToken);
+    return items.filter(function (item) { return item.status !== "cancelled"; });
+  }
+
+  async function createEvent(accessToken, body, fetchImpl) {
+    try {
+      return await calendarFetch(accessToken, CALENDAR_API, { method: "POST", body: JSON.stringify(body) }, fetchImpl);
+    } catch (error) {
+      if (error.code !== "EXISTS" || !body.id) throw error;
+      return calendarFetch(accessToken, CALENDAR_API + "/" + encodeURIComponent(body.id), { method: "GET" }, fetchImpl);
+    }
+  }
+
+  function updateEvent(accessToken, id, patch, etag, fetchImpl) {
+    if (!id || !etag) return Promise.reject(new Error("일정을 새로고침한 뒤 수정해 주세요."));
+    return calendarFetch(accessToken, CALENDAR_API + "/" + encodeURIComponent(id), {
+      method: "PATCH", headers: { "If-Match": etag }, body: JSON.stringify(patch)
+    }, fetchImpl);
+  }
+
+  function deleteEvent(accessToken, id, etag, fetchImpl) {
+    if (!id || !etag) return Promise.reject(new Error("일정을 새로고침한 뒤 삭제해 주세요."));
+    return calendarFetch(accessToken, CALENDAR_API + "/" + encodeURIComponent(id), {
+      method: "DELETE", headers: { "If-Match": etag }
+    }, fetchImpl);
   }
 
   async function insertEvents(accessToken, events, messages, fetchImpl) {
@@ -380,6 +412,9 @@
     findConflicts: findConflicts,
     requestAccessToken: requestAccessToken,
     listEvents: listEvents,
+    createEvent: createEvent,
+    updateEvent: updateEvent,
+    deleteEvent: deleteEvent,
     insertEvents: insertEvents,
     syncAndInsert: syncAndInsert,
     selectedRange: selectedRange

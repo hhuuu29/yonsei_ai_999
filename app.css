@@ -1,4 +1,49 @@
 /* DoToDo: a quiet conversation workspace beside a personal day planner. */
+#openCalendar { display: inline-flex; align-items: center; }
+.calendar-manager { box-sizing: border-box; width: min(1040px, calc(100vw - 32px)); max-height: 90dvh; padding: 28px; border: 1px solid #DCE4F0; border-radius: 22px; color: #1F2D43; background: #fff; box-shadow: 0 24px 90px #14284430; }
+.calendar-manager::backdrop { background: #17264070; }
+.calendar-manager button, .calendar-manager input { font: inherit; box-sizing: border-box; }
+.calendar-manager button { min-height: 44px; border: 1px solid #DCE4F0; border-radius: 10px; background: #fff; color: #1F2D43; padding: 9px 13px; cursor: pointer; }
+.calendar-manager button:disabled { opacity: .5; cursor: wait; }
+.calendar-manager button:focus-visible, .calendar-manager input:focus-visible { outline: 3px solid #315ED4; outline-offset: 2px; }
+.calendar-manager .cm-primary { background: #315ED4; border-color: #315ED4; color: white; }
+.cm-header, .cm-toolbar, .cm-form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cm-header { justify-content: space-between; }
+.cm-header h2 { margin: 0; font-size: 26px; letter-spacing: -.05em; }
+.cm-note, .cm-status { color: #607089; font-size: 13px; line-height: 1.7; }
+.cm-status { min-height: 24px; margin: 16px 0; }
+.cm-toolbar { margin-top: 20px; }
+.cm-toolbar strong { min-width: 104px; text-align: center; }
+.cm-layout { display: grid; grid-template-columns: 1.25fr 1fr; gap: 28px; align-items: start; }
+.cm-grid { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 5px; }
+.cm-weekday { text-align: center; padding: 12px 0; color: #607089; font-size: 12px; }
+.calendar-manager .cm-day { min-height: 66px; padding: 8px 2px; border-color: transparent; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cm-day small { font-size: 10px; color: #315ED4; }
+.calendar-manager .cm-day[aria-current=date] { text-decoration: underline; text-underline-offset: 4px; }
+.calendar-manager .cm-day[aria-pressed=true] { background: #E8EEFF; border-color: #315ED4; }
+.cm-agenda { border-left: 1px solid #DCE4F0; padding-left: 24px; min-width: 0; }
+.cm-agenda h3 { margin: 10px 0 16px; font-size: 19px; }
+.cm-agenda p, .cm-editor p { color: #607089; font-size: 13px; line-height: 1.7; }
+.calendar-manager .cm-event { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 7px; width: 100%; margin-top: 12px; padding: 16px; overflow-wrap: anywhere; }
+.cm-event small { color: #315ED4; font-size: 12px; }
+.cm-event strong { font-size: 15px; }
+.cm-event span { color: #607089; font-size: 12px; }
+.cm-editor:empty { display: none; }
+.cm-editor { margin-top: 24px; border-top: 1px solid #DCE4F0; padding-top: 12px; }
+.cm-editor label { display: flex; flex-direction: column; gap: 7px; margin: 14px 0; font-size: 13px; }
+.cm-editor input { min-height: 44px; min-width: 0; width: 100%; padding: 10px 12px; color: #1F2D43; border: 1px solid #DCE4F0; border-radius: 9px; background: white; }
+.cm-editor input[type=checkbox] { width: 20px; height: 20px; min-height: 20px; }
+.calendar-manager .cm-danger { color: #A54920; margin-left: auto; }
+@media (max-width: 700px) {
+  .calendar-manager { padding: 18px; width: calc(100vw - 16px); max-height: 94dvh; }
+  .cm-layout { grid-template-columns: 1fr; gap: 16px; }
+  .cm-agenda { border-left: 0; border-top: 1px solid #DCE4F0; padding: 12px 0 0; }
+  .calendar-manager .cm-day { min-height: 52px; }
+  .cm-toolbar { gap: 6px; }
+  .cm-toolbar button { padding: 8px; font-size: 12px; }
+  .cm-toolbar strong { min-width: 90px; font-size: 14px; }
+  .top-actions { flex-wrap: wrap; }
+}
 :root {
   --bg: #F6F8FC;
   --paper: #FFFFFF;

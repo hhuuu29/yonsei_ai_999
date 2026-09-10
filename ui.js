@@ -1169,6 +1169,23 @@
   if (btnGoogle) btnGoogle.addEventListener("click", function () { addToGoogleCalendar(); });
   loadCalendarConfig();
 
+  if (root.DoToDoCalendarManager) root.DoToDoCalendarManager.mount({
+    currentToken: function () { return tokenStillValid() ? state.googleToken.accessToken : ""; },
+    invalidateToken: function () { state.googleToken = null; },
+    connect: async function () {
+      if (state.calendarBusy) return "";
+      if (!state.googleClientId) { loadCalendarConfig(); return ""; }
+      if (tokenStillValid()) return state.googleToken.accessToken;
+      state.calendarBusy = true;
+      updateSelection();
+      try {
+        var token = await calendar.requestAccessToken({ clientId: state.googleClientId, googleIdentity: root.google });
+        state.googleToken = token && token.status === "success" ? token : null;
+        return state.googleToken ? state.googleToken.accessToken : "";
+      } finally { state.calendarBusy = false; updateSelection(); }
+    }
+  });
+
   apiKeyInput.value = loadStoredApiKey();
   try { state.userName = audienceApi.normalizeName(root.localStorage.getItem(NAME_STORAGE)); } catch (error) { /* storage is optional */ }
   identityButton.addEventListener("click", function () {
