@@ -33,7 +33,7 @@
 ## 첫 운영 버전 확정 (2026-09-10)
 - 개인 비서 + 친구에게 일정 공유. 팀 공동 편집은 이후 범위
 - 설계: docs/plans/2026-09-10-personal-assistant-design.md
-- 새 Supabase 프로젝트 연결·Email 인증 활성화 확인, Vercel Production 서버 환경변수 3개 등록 완료. 운영 SQL 설치와 OTP 메일·SMTP 설정은 아직 확인되지 않음
+- 새 Supabase 프로젝트 연결·Email 인증 활성화 확인, Vercel Production 서버 환경변수 3개 등록 완료. 운영 SQL 설치와 실제 Auth·REST 저장/복원·계정 격리·공유 해제 검증 완료. Security Advisor 오류·경고 0건. 일반 사용자 로그인은 Custom SMTP 또는 Google 로그인 연결 필요
 - 현재 캘린더는 로그인한 Google 계정의 기본 캘린더를 직접 사용. 토큰은 메모리에만 보관하고 자동 백그라운드 동기화는 제공하지 않음
 
 ## 데모 데이터 (data/)

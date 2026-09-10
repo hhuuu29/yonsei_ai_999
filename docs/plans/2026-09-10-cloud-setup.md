@@ -1,5 +1,13 @@
 # 개인 보관함·공유 링크 운영 연결
 
+## 운영 적용 상태 (2026-09-10)
+
+- dotodo Supabase 프로젝트에 `10_personal_library.sql` 설치 완료. 두 테이블의 REST 조회 정상, Security Advisor 오류·경고 0건.
+- Vercel Production에 Supabase 서버 환경변수 3개 등록 완료.
+- 실제 Supabase Auth·REST에서 가상 계정 2개로 저장/복원, 재시도 중복 방지, 계정 간 접근 차단, 공유 생성/미리보기/해제 검증 완료. 검증 후 세션을 해제하고 가상 계정·데이터를 삭제했다.
+- 일반 사용자 이메일 OTP 발송은 미완료. 현재 무료 프로젝트는 Custom SMTP 없이 메일 템플릿을 바꿀 수 없고, 기본 발송 대상도 프로젝트 팀 이메일로 제한된다. SMTP 연결 또는 Google 로그인 선택이 필요하다.
+- 실제 이메일 수신과 실계정 Google 캘린더 등록은 위 DB 검증에 포함하지 않았다.
+
 ## 구현 범위
 
 순수 JS와 Vercel 서버 함수를 유지한다. Supabase Auth 이메일 OTP로 로그인하고 PostgreSQL에 선택한 일정·할 일의 사본을 저장한다. 보관함과 Google 계정 연결은 별개다. Google 캘린더의 자동 백그라운드 동기화는 포함하지 않는다.
