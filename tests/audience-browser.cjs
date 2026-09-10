@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const server = http.createServer((req, res) => {
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
-  if (!['index.html', 'app.css', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js', 'calendar-manager.js', 'data/trainthon-pc.txt'].includes(file)) {
+  if (!['index.html', 'app.css', 'cloud.css', 'snapshot.js', 'cloud-client.js', 'llm-extractor.js', 'ui.js', 'chat-assistant.js', 'google-calendar.js', 'calendar-manager.js', 'data/trainthon-pc.txt'].includes(file)) {
     res.writeHead(404).end(); return;
   }
   res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8');

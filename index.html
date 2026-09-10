@@ -776,6 +776,7 @@
     }
   </style>
   <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="cloud.css" />
 </head>
 <body>
   <div class="shell">
@@ -784,6 +785,7 @@
       <div class="top-actions">
         <button type="button" class="pill" id="identityButton" aria-expanded="false">나: 선택</button>
         <button type="button" class="ai-badge" id="aiBadge" aria-controls="apiPanel" aria-expanded="false">설정</button>
+        <button type="button" class="pill" id="openLibrary">보관함</button>
         <button type="button" class="pill" id="openCalendar">캘린더</button>
         <button type="button" class="pill" id="openBoard" aria-controls="board" aria-expanded="false">일정 <b id="mobileEventCount">0</b></button>
       </div>
@@ -826,6 +828,10 @@
         <button type="button" class="close" id="closeBoard">닫기</button>
       </div>
       <div class="bl" id="boardList"></div>
+      <div class="cloud-actions">
+        <button type="button" id="btnSaveCloud" disabled>보관함에 저장</button>
+        <button type="button" id="btnShare" disabled>친구에게 공유</button>
+      </div>
       <div class="ba">
         <button type="button" id="btnExport" disabled>.ics 저장</button>
         <button type="button" class="go" id="btnGoogle" disabled>구글 캘린더에 추가</button>
@@ -1861,6 +1867,8 @@
   <script src="chat-assistant.js"></script>
   <script src="google-calendar.js"></script>
   <script src="calendar-manager.js"></script>
+  <script src="snapshot.js"></script>
+  <script src="cloud-client.js"></script>
   <script src="ui.js"></script>
 </body>
 </html>

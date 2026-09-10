@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+  <title>공유받은 일정 · 두투두</title><link rel="stylesheet" href="cloud.css">
+</head>
+<body class="share-page">
+  <main class="share-card">
+    <a href="/" class="share-brand">✓ 두투두</a>
+    <h1 id="shareTitle">공유받은 일정</h1>
+    <p>함께할 약속을 내 캘린더에 담아보세요.</p>
+    <p id="shareStatus" role="status">공유 내용을 불러오는 중…</p>
+    <section id="shareContent"></section>
+    <button type="button" id="shareImport" class="cloud-primary" disabled>내 Google 캘린더에 추가</button>
+    <p class="share-note">한국 시간(서울) 기준입니다. 등록하면 내 기본 캘린더에 사본이 생겨요. 원본의 변경은 자동 반영되지 않으며, 다시 눌러도 중복 등록하지 않아요.</p>
+  </main>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  <script src="google-calendar.js"></script><script src="snapshot.js"></script>
+  <script src="cloud-client.js"></script><script src="share.js"></script>
+</body>
+</html>

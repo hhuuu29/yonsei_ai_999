@@ -4,5 +4,5 @@
   "buildCommand": null,
   "outputDirectory": ".",
   "cleanUrls": true,
-  "functions": { "api/gemini.js": { "maxDuration": 60 } }
+  "functions": { "api/gemini.js": { "maxDuration": 60 }, "api/cloud.js": { "maxDuration": 60 } }
 }

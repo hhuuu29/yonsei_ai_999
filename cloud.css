@@ -1,0 +1,28 @@
+.cloud-panel { box-sizing:border-box; width:min(680px,calc(100vw - 24px)); max-height:90dvh; padding:28px; border:1px solid #DCE4F0; border-radius:22px; color:#1F2D43; background:white; box-shadow:0 24px 90px #14284430; }
+.cloud-panel::backdrop { background:#17264070; }
+.cloud-panel header,.cloud-panel nav { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+.cloud-panel h2 { margin:0 0 12px; font-size:24px; letter-spacing:-.05em; }
+.cloud-panel nav { justify-content:flex-start; margin:16px 0; }
+.cloud-panel button,.share-card button { box-sizing:border-box; min-height:44px; padding:10px 14px; border:1px solid #DCE4F0; border-radius:10px; color:#1F2D43; background:white; font:inherit; cursor:pointer; margin:5px 8px 5px 0; }
+.cloud-panel .cloud-primary,.share-card .cloud-primary { background:#315ED4; color:white; border-color:#315ED4; }
+.cloud-panel label { display:flex; flex-direction:column; gap:7px; margin:14px 0; font-size:14px; }
+.cloud-panel input { box-sizing:border-box; min-height:44px; width:100%; padding:10px 12px; border:1px solid #DCE4F0; border-radius:9px; color:#1F2D43; background:white; font:inherit; }
+.cloud-panel input[type=checkbox] { min-height:20px; width:20px; height:20px; flex-shrink:0; accent-color:#315ED4; }
+.cloud-event label { flex-direction:row; align-items:center; }
+.cloud-panel p,.share-card p { color:#607089; line-height:1.8; font-size:14px; overflow-wrap:anywhere; }
+.cloud-status { min-height:26px; }
+.cloud-event { padding:18px 0; border-top:1px solid #DCE4F0; overflow-wrap:anywhere; }
+.cloud-event h3 { margin:0 0 8px; font-size:18px; }
+.cloud-event p { margin:5px 0; }
+.cloud-panel :focus-visible,.share-card :focus-visible { outline:3px solid #315ED4; outline-offset:2px; }
+.cloud-panel button:disabled,.share-card button:disabled { opacity:.5; cursor:wait; }
+#openLibrary { display:inline-flex; align-items:center; }
+.cloud-actions { display:flex; gap:8px; padding:10px 18px; border-top:1px solid #DCE4F0; }
+.cloud-actions button { flex:1; min-height:44px; border:1px solid #DCE4F0; border-radius:10px; background:white; color:#315ED4; font:inherit; font-size:13px; cursor:pointer; }
+.cloud-actions button:disabled { opacity:.45; cursor:default; }
+.share-page { margin:0; background:#F6F8FC; color:#1F2D43; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
+.share-card { box-sizing:border-box; max-width:720px; margin:48px auto; padding:36px; background:white; border:1px solid #DCE4F0; border-radius:22px; }
+.share-brand { color:#315ED4; text-decoration:none; font-size:21px; font-weight:700; }
+.share-card h1 { font-size:30px; letter-spacing:-.05em; overflow-wrap:anywhere; margin-top:28px; }
+.share-card .share-note { font-size:12px; }
+@media(max-width:600px){.cloud-panel{padding:20px;} .share-card{margin:12px;padding:24px;} .top-actions{flex-wrap:wrap;} }

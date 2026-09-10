@@ -754,6 +754,7 @@
   }
 
   function appendItemEvidence(parent, item) {
+    if (state.sourceKind === "cloud") return;
     var details = element("details", "item-evidence");
     details.appendChild(element("summary", "src", "근거"));
     var indexes = [item.sourceMsgIndex].concat(item.audienceSourceMsgIndexes || []);
@@ -778,6 +779,10 @@
     selectedCount.textContent = selected + "개 선택";
     mobileEventCount.textContent = state.events.length;
     btnExport.disabled = selected === 0;
+    var saveCloud = document.getElementById("btnSaveCloud");
+    var shareCloud = document.getElementById("btnShare");
+    if (saveCloud) saveCloud.disabled = state.extracting || (selected === 0 && !state.todos.length);
+    if (shareCloud) shareCloud.disabled = state.extracting || selected === 0;
     if (btnGoogle) {
       btnGoogle.disabled = selected === 0 || state.calendarBusy;
       btnGoogle.textContent = state.calendarBusy ? "Google 연결·등록 중…" : "구글 캘린더에 추가";
@@ -997,7 +1002,7 @@
     sendButton.disabled = true;
     state.conversation.push({ role: "user", text: question });
 
-    if (!state.raw) {
+    if (!state.raw && state.sourceKind !== "cloud") {
       state.conversation.push({
         role: "assistant",
         text: "먼저 카톡 export나 회의록을 보내주세요",
@@ -1168,6 +1173,44 @@
   btnExport.addEventListener("click", downloadIcs);
   if (btnGoogle) btnGoogle.addEventListener("click", function () { addToGoogleCalendar(); });
   loadCalendarConfig();
+
+  if (root.DoToDoCloud) root.DoToDoCloud.mount({
+    title: function () { return String(state.fileName || "내 일정").slice(0, 120); },
+    snapshot: function () {
+      function wireDate(date, allDay) {
+        function pad(n) { return String(n).padStart(2, "0"); }
+        var value = date.getFullYear() + "-" + pad(date.getMonth()+1) + "-" + pad(date.getDate());
+        return allDay ? value : value + "T" + pad(date.getHours()) + ":" + pad(date.getMinutes()) + ":00+09:00";
+      }
+      return root.DoToDoSnapshot.sanitizeSnapshot({ events: selectedEvents().map(function (event) {
+        var start = effectiveDate(event);
+        var duration = event.end instanceof Date ? event.end - event.start : event.allDay ? 86400000 : 3600000;
+        return {title:event.title, start:wireDate(start,event.allDay), end:wireDate(new Date(start.getTime()+duration),event.allDay),
+          location:event.location || "", checklist:(event.checklist || []).map(function(item){return item.text;})};
+      }), todos:state.todos.map(function(todo){return {text:todo.text,done:!!todo.done};}) });
+    },
+    restore: function (saved) {
+      function wallDate(value) {
+        var parts=value.match(/\d+/g).map(Number);
+        return new Date(parts[0],parts[1]-1,parts[2],parts[3]||0,parts[4]||0,parts[5]||0);
+      }
+      state.runId++; state.assistantRequestId++; state.assistantBusy=false; state.extracting=false;
+      state.events=prepareEvents(saved.snapshot.events.map(function(event,index){return {
+        eventId:saved.id+"-"+index,title:event.title,start:wallDate(event.start),end:wallDate(event.end),allDay:event.start.length===10,
+        location:event.location,checklist:event.checklist.map(function(text){return {text:text,audience:"all"};}),audience:"all",selected:true
+      };}));
+      state.todos=saved.snapshot.todos.map(function(todo){return {text:todo.text,done:todo.done,audience:"all"};});
+      state.raw="";state.messages=[];state.teams=[];state.conversation=[];state.history=[];state.fileName=saved.title;state.sourceKind="cloud";
+      state.choosingName=false;state.summary="보관함의 일정과 할 일을 열었어요. 원문 대화는 저장하지 않아 근거를 다시 확인할 수 없어요.";
+      renderAll();
+    },
+    onLogout: function () {
+      if(state.sourceKind!=="cloud")return;
+      state.runId++;state.assistantRequestId++;state.assistantBusy=false;
+      state.events=[];state.todos=[];state.messages=[];state.conversation=[];state.history=[];state.raw="";state.fileName="";state.sourceKind="chat";
+      renderAll();
+    }
+  });
 
   if (root.DoToDoCalendarManager) root.DoToDoCalendarManager.mount({
     currentToken: function () { return tokenStillValid() ? state.googleToken.accessToken : ""; },

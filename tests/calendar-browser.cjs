@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const allowed = ['index.html','app.css','ui.js','llm-extractor.js','chat-assistant.js','google-calendar.js','calendar-manager.js'];
+const allowed = ['index.html','app.css','cloud.css','snapshot.js','cloud-client.js','ui.js','llm-extractor.js','chat-assistant.js','google-calendar.js','calendar-manager.js'];
 const server = http.createServer((req,res)=>{
   const file = req.url === '/' ? 'index.html' : req.url.slice(1);
   if (!allowed.includes(file)) return res.writeHead(404).end();
